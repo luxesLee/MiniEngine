@@ -75,7 +75,6 @@ void PresentWindow::processInput()
 
 void PresentWindow::framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    g_Camera->Aspect = width * 1.0f / height;
     g_Camera->screenWidth = width;
     g_Camera->screenHeight = height;
     g_Camera->bResize = true;

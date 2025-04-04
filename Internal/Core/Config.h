@@ -42,6 +42,7 @@ public:
     int maxRayTracingDepth = 1;
     uint32_t accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;
+    uint32_t texWidth = 2048, texHeight = 2048;
 
     // action
     bool bRenderdocCapture = false;

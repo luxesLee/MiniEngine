@@ -77,7 +77,7 @@ void Scene::prepareTransform()
 
 void Scene::prepareTexture()
 {
-    int reqWidth = 2048, reqHeight = 2048;
+    int reqWidth = g_Config->texWidth, reqHeight = g_Config->texHeight;
     int texBytes = reqWidth * reqHeight * 4;
     textureMapsArray.resize(texBytes * textures.size());
 

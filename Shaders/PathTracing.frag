@@ -466,20 +466,28 @@ void main()
         if(TraceRay(ray, hitInfo))
         {
             Material mat = GetMatrixData(hitInfo.matID, hitInfo.barycentricUV);
+            Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
+
+
             // avoid to trace rays for every lights, so need to find the most important one
+            int lightIndex = 0;
+            float lightWeight = 0.0f;
             //if(SampleLightRIS())
             {
-                //Light lightInfo = GetLightData(0);
+                Light lightInfo = GetLightData(0);
                 // zero or one
                 float visibility;
                 // This wi is the light to bounce point
-                vec3 wi;
-                //float NdotL = clamp(, 0.0f, 1.0f); 
+                vec3 wi = normalize(-lightInfo.direction.xyz);
+                float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
                 // current shading point's direct lighting
                 vec3 directLighting;
+                //vec3 directLighting = DefaultBRDF(wi, wo, worldNormal, brdf.Diffuse, brdf.Specular, brdf.Roughness) * visibility * lightInfo.color.rgb * NdotL;
+
                 // calculate the contribute to ori shading point
-                
+                // radiance += lightWeight * (directLighting + mat.emissive) * throughput / pdf;
+
                 // we take the baseColor as output currently
                 radiance = mat.baseColor;
             }

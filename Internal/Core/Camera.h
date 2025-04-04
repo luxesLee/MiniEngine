@@ -13,9 +13,6 @@ enum Camera_Movement {
     RIGHT
 };
 
-// Default camera values
-const float SENSITIVITY =  0.1f;
-
 // An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
 class Camera
 {
@@ -27,7 +24,6 @@ public:
     glm::vec3 Right;
 
     // camera options
-    float Aspect;
     uint32_t screenWidth;
     uint32_t screenHeight;
     bool bResize;
