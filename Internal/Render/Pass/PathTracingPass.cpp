@@ -65,6 +65,7 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
         checkGLError();
        
         shader->use();
+        checkGLError();
         glDrawArrays(GL_TRIANGLES, 0, 3);
    
         glBindFramebuffer(GL_READ_FRAMEBUFFER, pathTracingFBO);

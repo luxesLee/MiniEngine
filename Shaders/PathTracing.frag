@@ -35,6 +35,9 @@ layout(binding = 1) uniform PathTracingUBO
 };
 
 #define FLT_MAX 3.402823466e+38
+#define PI 3.1415926
+#define INVPI 0.31830989161
+#define MIN_ROUGHNESS 0.03
 
 struct Ray
 {
@@ -104,8 +107,8 @@ struct Material
 
 struct Brdf
 {
-    vec3 diffuse;
-    vec3 specular;
+    vec3 diffuseAlbedo;
+    vec3 specularF0;
     float roughness;
 };
 
@@ -330,9 +333,15 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     return true;
 }
 
-bool TraceShadow()
+// from pos to light pos whether any hinders
+float TraceShadow(vec3 worldPos, Light lightInfo)
 {
-    return true;
+    Ray ray2Light;
+    ray2Light.origin = worldPos;
+    ray2Light.direction = -lightInfo.direction.xyz;
+    HitInfo hitInfoTemp;
+    bool bAnyHit = TraceRay(ray2Light, hitInfoTemp);
+    return bAnyHit ? 0.0f : 1.0f;
 }
 
 // from RTXGI Resampled Importance Sampling
@@ -356,18 +365,90 @@ bool SampleLightRIS()
     return true;
 }
 
+float DielectricSpecularToF0(float specular)
+{
+    return 0.08f * specular;
+}
+
+// F0 = mix(vec3(), albedo(baseColor), metallic);
+vec3 ComputeF0(float specular, vec3 baseColor, float metalness)
+{
+    return mix(DielectricSpecularToF0(specular).xxx, baseColor, metalness);
+}
+
 Brdf GetBrdfData(Material material)
 {
     Brdf data;
-    //data.diffuse = ComputeDiffuseColor(material.baseColor, material.metallic);
-    //data.specular = ComputeF0(material.specular, material.baseColor, material.metallic);
+    data.diffuseAlbedo = material.baseColor * (1 - material.metallic);
+    // This specular when incident angle is zero
+    data.specularF0 = ComputeF0(material.specularTint, material.baseColor, material.metallic);
     data.roughness = material.roughness;
     return data;
+}
+
+// Normal distribution term
+float D_GGX(vec3 N, vec3 H, float a)
+{
+    float a2 = clamp(a * a, 0.0001f, 1.0f);
+    float NdotH = clamp(dot(N, H), 0.0f, 1.0f);
+    
+    float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    
+    return a2 / (max(denom, 0.001f));
+}
+
+// Geometry
+float V_SmithGGX(vec3 N, vec3 V, vec3 L, float a)
+{
+    float a2 = clamp(a * a, 0.0001f, 1.0f);
+    float NdotV = clamp(abs(dot(N, V)) + 1e-5, 0.0f, 1.0f);
+    float NdotL = clamp(dot(N, L), 0.0f, 1.0f);
+
+    float G_V = NdotV + sqrt((NdotV - NdotV * a2) * NdotV + a2);
+    float G_L = NdotL + sqrt((NdotL - NdotL * a2) * NdotL + a2);
+    return 1.0f / (G_V * G_L);
+}
+
+// Fresnel -- Specular reflection ratio
+vec3 F_Schlick(vec3 V, vec3 H, vec3 F0)
+{
+    float VdotH = clamp(dot(V, H) + 1e-5, 0.0f, 1.0f);
+    return F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+}
+
+vec3 SpecularBRDF(vec3 N, vec3 V, vec3 L, vec3 specular, float roughness, out vec3 F)
+{
+    roughness = max(roughness, MIN_ROUGHNESS);
+
+    float a = roughness * roughness;
+    vec3 H = normalize(V + L);
+
+    float D = D_GGX(N, H, a);
+    float Vis = V_SmithGGX(N, V, L, a);
+    F = F_Schlick(V, H, specular);
+
+    // DFG
+    return D * Vis * F;
+}
+
+vec3 DefaultBRDF(vec3 L, vec3 V, vec3 N, vec3 diffuse, vec3 specular, float roughness)
+{
+    vec3 F;
+    vec3 specularBrdf = SpecularBRDF(N, V, L, specular, roughness, F);
+    // F -- Specular reflection ratio, so 1 - F is the diffuse ratio
+    vec3 diffuseBrdf = diffuse * INVPI * (1.0 - F); 
+
+    return diffuseBrdf + specularBrdf;
 }
 
 Light GetLightData(int index)
 {
     Light data;
+    data.position = vec4(0.0f);
+    // data.direction = vec4(0, -0.97f, -0.2431f, 0);
+    data.direction = vec4(0, -0.995f, -0.1f, 0);
+    data.color = vec4(7.15f, 6.33478f, 6.0917f, 6.5f);
     return data;
 }
 
@@ -428,12 +509,47 @@ Material GetMatrixData(int index, vec2 uv)
         data.roughness = max(matRgh.y * matRgh.y, 0.001);
     }
 
+    if(texIDs.z >= 0)
+    {
+        // vec3 texNormal = texture(textureMapsArrayTex, vec3(state.texCoord, texIDs.z)).rgb;
+    }
+
     if(texIDs.w >= 0)
     {
 
     }
 
     return data;
+}
+
+float luminance(vec3 color) 
+{
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+// from RTXGI 
+float GetSpecularBrdfProbability(vec3 diffuseAlbedo, vec3 specularF0)
+{
+    float lumDiffuse = luminance(diffuseAlbedo);
+    float lumSpecularF0 = luminance(specularF0);
+
+    // float specular, diffuse;
+    float probability = (lumSpecularF0 / max(0.0001f, (lumSpecularF0 + lumDiffuse)));
+    return clamp(probability, 0.1f, 0.9f);
+}
+
+vec3 GetCosHemisphereSample(vec3 hitNormal, inout uint rng)
+{
+
+
+
+    return vec3(1.0f);
+}
+
+vec3 SampleGGX(vec3 hitNormal, float roughness, vec2 randVal)
+{
+
+    return vec3(1.0f);
 }
 
 void main()
@@ -460,7 +576,7 @@ void main()
     vec3 throughput = vec3(1.0f);
     float pdf = 1.0f;
     // only take one bounce into consideration
-    for(int i = 0; i < 1; i++)
+    for(int i = 0; i < maxDepth; i++)
     {
         HitInfo hitInfo;
         if(TraceRay(ray, hitInfo))
@@ -469,27 +585,24 @@ void main()
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 
-
             // avoid to trace rays for every lights, so need to find the most important one
             int lightIndex = 0;
-            float lightWeight = 0.0f;
+            float lightWeight = 1.0f;
             //if(SampleLightRIS())
             {
                 Light lightInfo = GetLightData(0);
                 // zero or one
-                float visibility;
-                // This wi is the light to bounce point
+                float visibility = TraceShadow(hitInfo.worldPosition, lightInfo);
                 vec3 wi = normalize(-lightInfo.direction.xyz);
                 float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
-                // current shading point's direct lighting
-                vec3 directLighting;
-                //vec3 directLighting = DefaultBRDF(wi, wo, worldNormal, brdf.Diffuse, brdf.Specular, brdf.Roughness) * visibility * lightInfo.color.rgb * NdotL;
+                // shade direct lighting
+                vec3 directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * NdotL;
 
                 // calculate the contribute to ori shading point
-                // radiance += lightWeight * (directLighting + mat.emissive) * throughput / pdf;
+                radiance += lightWeight * (directLighting + mat.emission) * throughput / pdf;
 
                 // we take the baseColor as output currently
-                radiance = mat.baseColor;
+                // radiance = vec3(visibility, 0, 0);
             }
 
             // not need to compute the following bounce point weight
@@ -501,15 +614,38 @@ void main()
             // This wi equals viewDir for the bounce point
             vec3 wi;
 
-            // update throughput and pdf based on whether 
-            bool bDiffuse;
+            // sample Brdf to generate next ray
+            float probSpecular = GetSpecularBrdfProbability(brdf.diffuseAlbedo, brdf.specularF0); 
+            bool bDiffuse = RNG_next(rng) > probSpecular;
             if(bDiffuse)
             {
+                vec3 diffuseBrdf = brdf.diffuseAlbedo * INVPI;
+                // Diffuse model need to generate ray from cos hemisphere distribution
+                wi = GetCosHemisphereSample(hitInfo.worldNormal, rng);
 
+                float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f);
+                throughput *= diffuseBrdf * NdotL;
+                pdf *= (NdotL / PI) * (1 - probSpecular);
             }
             else
             {
+                // SampleGGX returns a normal in micro surface and we use this normal to generate the ray
+                vec3 H = SampleGGX(hitInfo.worldNormal, brdf.roughness, vec2(RNG_next(rng), RNG_next(rng)));
+                wi = reflect(-wo, H);
 
+                vec3 F;
+                vec3 specularBrdf = SpecularBRDF(hitInfo.worldNormal, wo, wi, brdf.specularF0, brdf.roughness, F);
+                float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f);
+
+                throughput *= specularBrdf * NdotL;
+
+                float a = brdf.roughness * brdf.roughness;
+                float D = D_GGX(hitInfo.worldNormal, H, a);
+                float NdotH = clamp(dot(hitInfo.worldNormal, H), 0.0f, 1.0f);
+                float LdotH = clamp(dot(wi, H), 0.0f, 1.0f);
+                float NdotV = clamp(dot(hitInfo.worldNormal, wo), 0.0f, 1.0f);
+                float samplePDF = D * NdotH / (4 * LdotH);
+                pdf *= samplePDF * probSpecular;
             }
 
             // Modified Ray
