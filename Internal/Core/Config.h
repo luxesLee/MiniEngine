@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <string>
+#include <glm.hpp>
 
 enum LightMode
 {
@@ -28,10 +30,18 @@ public:
     }
 
     // screen
-    uint32_t screenWidth;
-    uint32_t screenHeight;
+    uint32_t screenWidth = 1280;
+    uint32_t screenHeight = 960;
+    std::string title = "MiniEngine";
+
+    // model
+    std::string initModelPath = "../../Resource/Model/Sponza/glTF/Sponza.gltf";
 
     // camera
+    glm::vec3 initCameraPos = glm::vec3(7.72f, 2.5f, -1.0f);
+    glm::vec3 initCameraLookAt = glm::vec3(6.72f, 2.5f, -1.0f);
+    float initCameraZoom = 45.0f;
+
     float cameraMoveSpeed = 7.0f;
     float cameraRotSensitivity = 0.1f;
     float cameraZNear = 800.0f;
@@ -48,6 +58,7 @@ public:
     bool bRenderdocCapture = false;
     bool bShadeBaseColor = false;
 
+    bool bMouseMove = false;
 
 private:
     Config() {}

@@ -582,6 +582,9 @@ void main()
         if(TraceRay(ray, hitInfo))
         {
             Material mat = GetMatrixData(hitInfo.matID, hitInfo.barycentricUV);
+            radiance = mat.baseColor;
+            color = vec4(radiance, 1.0f);
+            return;
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 

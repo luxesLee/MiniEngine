@@ -42,8 +42,7 @@ void Engine::Resize()
 
 void Engine::InitializeModel()
 {
-    std::string modelPath = "../../Resource/Model/Sponza/glTF/Sponza.gltf";
-    modelLoader->loadModel(scene.get(), modelPath);
+    modelLoader->loadModel(scene.get(), g_Config->initModelPath);
     modelLoader->loadLight(scene.get(), "");
     scene->buildScene();
 }

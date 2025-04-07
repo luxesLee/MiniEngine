@@ -7,16 +7,6 @@
 #include "Util/Timer.h"
 #include "Config.h"
 
-#define DEFAULT_SRC_WIDTH 1280
-#define DEFAULT_SRC_HEIGHT 1024
-#define DEFAULT_TITLE "MiniEngine"
-
-PresentWindow::PresentWindow()
-    : curWidth(DEFAULT_SRC_WIDTH), curHeight(DEFAULT_SRC_HEIGHT), bResize(false)
-{
-    InitWindow(DEFAULT_SRC_WIDTH, DEFAULT_SRC_HEIGHT, DEFAULT_TITLE);
-}
-
 PresentWindow::PresentWindow(uint16_t width, uint16_t height, std::string title)
     : curWidth(width), curHeight(height), bResize(false)
 {
@@ -50,9 +40,11 @@ void PresentWindow::InitWindow(uint16_t width, uint16_t height, std::string titl
     g_Camera->screenHeight = height;
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mousebutton_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwMakeContextCurrent(window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+    {
         std::cout << "glad failed" << std::endl;
     }
     glfwSwapInterval(0);
@@ -78,10 +70,13 @@ void PresentWindow::framebuffer_size_callback(GLFWwindow *window, int width, int
     g_Camera->screenWidth = width;
     g_Camera->screenHeight = height;
     g_Camera->bResize = true;
+    g_Config->screenWidth = width;
+    g_Config->screenHeight = height;
+    g_Config->accumulateFrames = 0;
 }
 
-float lastX = DEFAULT_SRC_WIDTH / 2.0f;
-float lastY = DEFAULT_SRC_HEIGHT / 2.0f;
+float lastX = g_Config->screenWidth / 2.0f;
+float lastY = g_Config->screenHeight / 2.0f;
 bool firstMouse = true;
 void PresentWindow::mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
 {
@@ -101,10 +96,32 @@ void PresentWindow::mouse_callback(GLFWwindow *window, double xposIn, double ypo
     lastX = xpos;
     lastY = ypos;
 
+    if(!g_Config->bMouseMove)
+    {
+        return;
+    }
+
+    g_Config->accumulateFrames = 0;
     g_Camera->ProcessMouseMovement(xoffset, yoffset);
+}
+
+void PresentWindow::mousebutton_callback(GLFWwindow *window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT) 
+    {
+        if (action == GLFW_PRESS) 
+        {
+            g_Config->bMouseMove = true;
+        } 
+        else if (action == GLFW_RELEASE) 
+        {
+            g_Config->bMouseMove = false;
+        }
+    }
 }
 
 void PresentWindow::scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
     g_Camera->ProcessMouseScroll(static_cast<float>(yoffset));
+    g_Config->accumulateFrames = 0;
 }

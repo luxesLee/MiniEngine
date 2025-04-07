@@ -1,5 +1,6 @@
 #include "App.h"
 #include <GLFW/glfw3.h>
+#include "Config.h"
 #include "Render/ShaderManager.h"
 #include "Shader.h"
 
@@ -10,7 +11,7 @@ void App::Init()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = std::make_unique<PresentWindow>();
+    window = std::make_unique<PresentWindow>(g_Config->screenWidth, g_Config->screenHeight, g_Config->title);
     imguiManager = std::make_unique<ImGuiManager>(window->getWindow());
     engine = std::make_unique<Engine>();
 

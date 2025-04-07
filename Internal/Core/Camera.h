@@ -30,7 +30,7 @@ public:
 
     static Camera* getInstance()
     {
-        static Camera instance(glm::vec3(7.72f, 2.5f, -1.0f), glm::vec3(6.72f, 2.5f, -1.0f), 45.0f);
+        static Camera instance(g_Config->initCameraPos, g_Config->initCameraLookAt, g_Config->initCameraZoom);
         return &instance;
     }
 
@@ -75,6 +75,7 @@ public:
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)
     void ProcessKeyboard(Camera_Movement direction, float deltaTime)
     {
+        g_Config->accumulateFrames = 0;
         float velocity = g_Config->cameraMoveSpeed * deltaTime;
         if (direction == FORWARD)
             Position += Front * velocity;
