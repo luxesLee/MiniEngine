@@ -153,6 +153,17 @@ float RNG_next(inout uint s)
 	return float(s & 0x00FFFFFF) / float(0x01000000);
 }
 
+Light GetLightData(int index)
+{
+    Light data;
+    data.position = vec4(0.0f);
+    // data.direction = vec4(0, -0.97f, -0.2431f, 0);
+    data.direction = vec4(0, -0.98f, -0.2f, 0);
+    // data.direction = vec4(0, -0.95f, -0.31f, 0);
+    data.color = vec4(17.15f, 16.3478f, 16.0917f, 6.5f);
+    return data;
+}
+
 float AABBIntersect(vec3 pmin, vec3 pmax, Ray ray)
 {
     vec3 invDir = 1.0f / ray.direction;
@@ -169,6 +180,7 @@ float AABBIntersect(vec3 pmin, vec3 pmax, Ray ray)
     return (t1 >= t0) ? (t0 > 0.0f ? t0 : t1) : -1.0f;
 }
 
+#define EPS 0.01
 bool TraceRay(Ray ray, out HitInfo hitInfo)
 {
     // 1. Search in TLAS and store the possible index in stack 
@@ -214,10 +226,10 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
                 float det = dot(e1, h1);
 
                 // parallel
-                if(det > -1e-5 && det < 1e-5)
-                {
-                    continue;
-                }
+                // if(det > -1e-5 && det < 1e-5)
+                // {
+                //     continue;
+                // }
 
                 // det[(O - A) (B - A) (C - A)] = o2A(cross(e1, e2)) = e2(cross(o2A, e1))
                 // det[-d (O - A) (C - A)] = -d(cross(o2A, e2)) = o2A(cross(d, e2))
@@ -317,11 +329,11 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
         return false;
     }
 
-    // Next we will compute the rest hitInfo
-    // uv and normal need to read texture so just read once
-    hitInfo.worldPosition = ray.origin + t * ray.direction;
+    // 此处的EPS将命中点向射线方向推出一点距离，使得判定可见性时结果更准确，最终收敛更快
+    hitInfo.worldPosition = ray.origin + (t - EPS) * ray.direction;
     hitInfo.t = t;
 
+    // 将uv和法向放在循环外，仅需采样一次
     vec2 uv0 = texelFetch(uvTex, hitInfo.triIndice.x).xy;
     vec2 uv1 = texelFetch(uvTex, hitInfo.triIndice.y).xy;
     vec2 uv2 = texelFetch(uvTex, hitInfo.triIndice.z).xy;
@@ -331,8 +343,135 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     vec3 n1 = texelFetch(normalTex, hitInfo.triIndice.y).xyz;
     vec3 n2 = texelFetch(normalTex, hitInfo.triIndice.z).xyz;
     vec3 localNormal = n0 * hitInfo.triUVW.x + n1 * hitInfo.triUVW.y + n2 * hitInfo.triUVW.z;
-    hitInfo.worldNormal = normalize(transpose(inverse(mat3(hitInfo.object2WorldTransform))) * localNormal);
+    hitInfo.worldNormal = normalize(transpose((mat3(hitInfo.object2WorldTransform))) * localNormal);
     return true;
+}
+
+// 为上面TraceRay的简化版本，测算会快20ms左右
+bool TraceShadowRay(Ray ray)
+{
+    int curMatIndex = 0;
+    int stack[64];
+    int ptr = 0;
+    stack[ptr++] = -1;
+    int index = topBVHIndex;
+    bool bEnterBLAS = false;
+    mat4 transform;
+    Ray rayMS;
+    rayMS.origin = ray.origin;
+    rayMS.direction = ray.direction;
+    while(index != -1)
+    {
+        ivec3 LRLeaf = ivec3(texelFetch(bvhTex, index * 3 + 2).xyz);
+        int leaf = LRLeaf.z;
+        if(leaf > 0)    // BLAS's leaf
+        {
+            for(int i = 0; i < LRLeaf.y; i++)
+            {
+                ivec3 indice = ivec3(texelFetch(indiceTex, LRLeaf.x + i).xyz);
+
+                vec3 v1 = texelFetch(vertTex, indice.x).xyz;
+                vec3 v2 = texelFetch(vertTex, indice.y).xyz;
+                vec3 v3 = texelFetch(vertTex, indice.z).xyz;
+
+                vec3 e1 = v2 - v1;
+                vec3 e2 = v3 - v1;  
+
+                vec3 h1 = cross(rayMS.direction, e2);
+                float det = dot(e1, h1);
+
+                // parallel
+                if(det > -1e-5 && det < 1e-5)
+                {
+                    continue;
+                }
+
+                vec3 o2A = rayMS.origin - v1.xyz;
+                vec3 h2 = cross(o2A, e1);
+
+                vec4 tuvw;
+                tuvw.x = dot(e2, h2);
+                tuvw.y = dot(o2A, h1);
+                tuvw.z = dot(rayMS.direction, h2);
+                tuvw.xyz = tuvw.xyz / det;
+                tuvw.w = 1.0f - tuvw.y - tuvw.z;
+
+                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x > ray.Tmin)
+                {
+                    return true;
+                }
+            }
+        }
+        else if(leaf < 0)   // TLAS's leaf
+        {
+            // TLAS's LRLeaf.x is meshIndex
+            // TLAS's LRLeaf.y is materialId
+            // TLAS's LRLeaf.z is -(instanceId + 1)
+            vec4 r1 = texelFetch(transformTex, ivec2((-leaf - 1) * 4 + 0, 0), 0);
+            vec4 r2 = texelFetch(transformTex, ivec2((-leaf - 1) * 4 + 1, 0), 0);
+            vec4 r3 = texelFetch(transformTex, ivec2((-leaf - 1) * 4 + 2, 0), 0);
+            vec4 r4 = texelFetch(transformTex, ivec2((-leaf - 1) * 4 + 3, 0), 0);
+            transform = mat4(r1, r2, r3, r4);
+
+            // It is more efficient to turn rays into world space than vertices 
+            mat4 invTransform = inverse(transform);
+            rayMS.origin = vec3(invTransform * vec4(ray.origin, 1.0f));
+            rayMS.direction = vec3(invTransform * vec4(ray.direction, 0.0f));
+            
+            // Enter BLAS search
+            // A signal 
+            stack[ptr++] = -1;
+            bEnterBLAS = true;
+            index = LRLeaf.x;
+            curMatIndex = LRLeaf.y;
+            continue;
+        }
+        else
+        {
+            float leftHit = AABBIntersect(texelFetch(bvhTex, LRLeaf.x * 3).xyz, texelFetch(bvhTex, LRLeaf.x * 3 + 1).xyz, rayMS);
+            float rightHit = AABBIntersect(texelFetch(bvhTex, LRLeaf.y * 3).xyz, texelFetch(bvhTex, LRLeaf.y * 3 + 1).xyz, rayMS);
+            if(leftHit > 0.0f && rightHit > 0.0f)
+            {
+                // notice BVH node can be overlap
+                // and at this time we store the other one in stack
+                if(leftHit > rightHit)
+                {
+                    index = LRLeaf.y;
+                    stack[ptr++] = LRLeaf.x;
+                }
+                else
+                {
+                    index = LRLeaf.x;
+                    stack[ptr++] = LRLeaf.y;
+                }
+                continue;
+            }
+            else if(leftHit > 0.0f)
+            {
+                index = LRLeaf.x;
+                continue;
+            }
+            else if(rightHit > 0.0f)
+            {
+                index = LRLeaf.y;
+                continue;
+            }
+        }
+        
+        // only no hit with AS or after find BLAS will enter
+        index = stack[--ptr];
+
+        if(bEnterBLAS && index == -1)
+        {
+            // backTrack from stack and restore the ray
+            bEnterBLAS = false;
+            index = stack[--ptr];
+            rayMS.origin = ray.origin;
+            rayMS.direction = ray.direction;
+        }
+    }
+
+    return false;
 }
 
 // from pos to light pos whether any hinders
@@ -341,25 +480,36 @@ float TraceShadow(vec3 worldPos, Light lightInfo)
     Ray ray2Light;
     ray2Light.origin = worldPos;
     ray2Light.direction = -lightInfo.direction.xyz;
-    HitInfo hitInfoTemp;
-    // 此处有优化空间，仅需判断是否hit物体，无需计算最近，因为当前默认为方向光
-    bool bAnyHit = TraceRay(ray2Light, hitInfoTemp);
+    bool bAnyHit = TraceShadowRay(ray2Light);
     return bAnyHit ? 0.0f : 1.0f;
 }
 
 // from RTXGI Resampled Importance Sampling
+#define RIS_CANDIDATES_LIGHTS 8
 bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightIndex, out float sampleWeight)
 {
     float totalWeights = 0.0f;
     float samplePDF = 0.0f;
-    for(int i = 0; i < 1; i++)
+
+    int lightNum = 1;
+    int candidateMax = min(lightNum, RIS_CANDIDATES_LIGHTS);
+    for(int i = 0; i < candidateMax; i++)
     {
         // use RNG and get a random light
-        uint lightIndex = 1;
-        sampleWeight = 1.0f;
+        int randomLightIndex = min(int(RNG_next(rng) * lightNum), lightNum - 1);
+        float candidateWeight = float(lightNum);
 
+        Light lightInfo = GetLightData(randomLightIndex);
 
+        float candidatePdf;
+        float candidateRISWeight = candidatePdf * candidateWeight;
 
+        totalWeights += candidateRISWeight;
+        if(RNG_next(rng) < candidateRISWeight / totalWeights)
+        {
+            lightIndex = randomLightIndex;
+            samplePDF = candidatePdf;
+        }
     }
 
     if(totalWeights == 0.0f)
@@ -367,7 +517,7 @@ bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightInd
         return false;
     }
 
-
+    sampleWeight = (totalWeights / candidateMax) / samplePDF;
     return true;
 }
 
@@ -386,13 +536,12 @@ Brdf GetBrdfData(Material material)
 {
     Brdf data;
     data.diffuseAlbedo = material.baseColor * (1 - material.metallic);
-    // This specular when incident angle is zero
     data.specularF0 = ComputeF0(material.specularTint, material.baseColor, material.metallic);
     data.roughness = material.roughness;
     return data;
 }
 
-// Normal distribution term
+// 法线分布项
 float D_GGX(vec3 N, vec3 H, float a)
 {
     float a2 = clamp(a * a, 0.0001f, 1.0f);
@@ -404,7 +553,7 @@ float D_GGX(vec3 N, vec3 H, float a)
     return a2 / (max(denom, 0.001f));
 }
 
-// Geometry
+// 几何遮蔽项
 float V_SmithGGX(vec3 N, vec3 V, vec3 L, float a)
 {
     float a2 = clamp(a * a, 0.0001f, 1.0f);
@@ -416,7 +565,7 @@ float V_SmithGGX(vec3 N, vec3 V, vec3 L, float a)
     return 1.0f / (G_V * G_L);
 }
 
-// Fresnel -- Specular reflection ratio
+// Fresnel项
 vec3 F_Schlick(vec3 V, vec3 H, vec3 F0)
 {
     float VdotH = clamp(dot(V, H) + 1e-5, 0.0f, 1.0f);
@@ -448,20 +597,11 @@ vec3 DefaultBRDF(vec3 L, vec3 V, vec3 N, vec3 diffuse, vec3 specular, float roug
     return diffuseBrdf + specularBrdf;
 }
 
-Light GetLightData(int index)
+Material GetMatrixData(inout HitInfo hitInfo)
 {
-    Light data;
-    data.position = vec4(0.0f);
-    // data.direction = vec4(0, -0.97f, -0.2431f, 0);
-    data.direction = vec4(0, -0.98f, -0.2f, 0);
-    // data.direction = vec4(0, -0.95f, -0.31f, 0);
-    data.color = vec4(17.15f, 16.3478f, 16.0917f, 6.5f);
-    return data;
-}
+    int matIndex = 8 * hitInfo.matID;
+    vec2 uv = hitInfo.barycentricUV;
 
-Material GetMatrixData(int index, vec2 uv)
-{
-    int matIndex = 8 * index;
     vec4 param1 = texelFetch(matTex, ivec2(matIndex + 0, 0), 0);
     vec4 param2 = texelFetch(matTex, ivec2(matIndex + 1, 0), 0);
     vec4 param3 = texelFetch(matTex, ivec2(matIndex + 2, 0), 0);
@@ -504,8 +644,7 @@ Material GetMatrixData(int index, vec2 uv)
     if(texIDs.x >= 0)
     {
         vec4 col = texture(textureMapsArrayTex, vec3(uv, texIDs.x));
-        //data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
-        data.baseColor = col.rgb;
+        data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
         data.opacity *= col.a;
     }
 
@@ -513,17 +652,18 @@ Material GetMatrixData(int index, vec2 uv)
     {
         vec2 matRgh = texture(textureMapsArrayTex, vec3(uv, texIDs.y)).bg;
         data.metallic = matRgh.x;
-        data.roughness = max(matRgh.y * matRgh.y, 0.001);
+        data.roughness = max(matRgh.y, 0.001);
     }
 
-    if(texIDs.z >= 0)
-    {
-        // vec3 texNormal = texture(textureMapsArrayTex, vec3(state.texCoord, texIDs.z)).rgb;
-    }
+    // if(texIDs.z >= 0)
+    // {
+    //     vec3 texNormal = texture(textureMapsArrayTex, vec3(uv, texIDs.z)).rgb;
+    //     texNormal = normalize(texNormal * 2.0 - 1.0);
+    // }
 
     if(texIDs.w >= 0)
     {
-
+        data.emission = pow(texture(textureMapsArrayTex, vec3(uv, texIDs.w)).rgb, vec3(2.2));
     }
 
     return data;
@@ -570,11 +710,6 @@ vec3 GetCosHemisphereSample(vec3 hitNormal, vec2 randVec2)
     return tangent * r * cos(phi) + bitangent * r * sin(phi) + hitNormal * sqrt(1 - randVec2.x);
 }
 
-// vec3 GetUniformHemisphereSample(vec3 hitNormal)
-// {
-
-// }
-
 vec3 GetImportanceGGXSample(vec3 hitNormal, float roughness, vec2 randVec2)
 {
     float a2 = roughness * roughness;
@@ -593,7 +728,8 @@ vec3 GetImportanceGGXSample(vec3 hitNormal, float roughness, vec2 randVec2)
     return normalize(sampleVec);
 }
 
-vec3 OffsetRay(vec3 p, vec3 n) {
+vec3 OffsetRay(vec3 p, vec3 n) 
+{
     // 常量定义
     const float origin = 1.0 / 32.0;
     const float floatScale = 1.0 / 65536.0;
@@ -645,7 +781,7 @@ void main()
         HitInfo hitInfo;
         if(TraceRay(ray, hitInfo))
         {
-            Material mat = GetMatrixData(hitInfo.matID, hitInfo.barycentricUV);
+            Material mat = GetMatrixData(hitInfo);
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 
@@ -667,9 +803,9 @@ void main()
 
                 // 调试输出
                 // if(i == maxDepth - 1)
-                // // if(i == 0)
+                // if(i == 0)
                 // {
-                //     color = vec4(ray.origin + ray.direction * hitInfo.t, 1.0);
+                //     color = vec4(radiance, 1.0);
                 //     accum = vec4(hitInfo.t, 0, 0, 1.0f);
                 //     return;
                 // }
@@ -718,7 +854,7 @@ void main()
                 pdf *= samplePDF * probSpecular;
             }
 
-            // ray.origin = hitInfo.worldPosition + hitInfo.worldNormal * 0.03;
+            // ray.origin = hitInfo.worldPosition;
             ray.origin = OffsetRay(hitInfo.worldPosition, hitInfo.worldNormal);
             ray.direction = wi;
             ray.Tmin = 1e-2;
@@ -726,19 +862,18 @@ void main()
         }
         else
         {
-            // 未在AS上找到任何hit物体，从环境贴图上采样
-            //vec2 uv;
             //radiance += texture(envTex, uv).rgb * throughput / pdf;
-            // 暂未读取环境贴图，赋默认值0
-            // radiance += vec3(1.0f, 1.0f, 1.0f);
+            // 暂未读取环境贴图，赋默认值
+            radiance += vec3(0.310f, 0.404f, 0.541f) * throughput / pdf;
             break;
         }
     }
 
-    // accumulate previous one
+    vec3 accumColor = texelFetch(accumTex, ivec2(gl_FragCoord.xy), 0).rgb;
+    vec3 outputColor = radiance;
     if(accumulateFrames > 1)
     {
-        radiance += texelFetch(accumTex, ivec2(gl_FragCoord.xy), 0).rgb;
+        outputColor = mix(outputColor, accumColor / accumulateFrames, 0.95);
     }
     
     if (any(isnan(radiance)) || any(isinf(radiance)))
@@ -746,7 +881,6 @@ void main()
         radiance = vec3(1.0f, 0, 0);
     }
 
-    // output
-    color = vec4(radiance / accumulateFrames, 1.0f);
-    accum = vec4(radiance, 1.0f);
+    color = vec4(outputColor, 1.0f);
+    accum = vec4(radiance + accumColor, 1.0f);
 }

@@ -101,6 +101,50 @@ void Scene::prepareTexture()
     }
 }
 
+// 暂时这样写，后续用rendergraph
+void Scene::InitFBO()
+{
+    glGenFramebuffers(1, &pathTracingFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
+
+    glGenTextures(1, &pathTracingTexId);
+    glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenTextures(1, &accumTexId);
+    glBindTexture(GL_TEXTURE_2D, accumTexId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, DrawBuffers);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    checkGLError();
+
+// ----------------------------------------------------------------------------
+
+    glGenFramebuffers(1, &toneMappingFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, toneMappingFBO);
+
+    glGenTextures(1, &toneMappingTexId);
+    glBindTexture(GL_TEXTURE_2D, toneMappingTexId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, toneMappingTexId, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void Scene::UploadDataToGpu()
 {
     // flag of path tracing

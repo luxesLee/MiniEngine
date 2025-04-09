@@ -18,10 +18,12 @@ public:
 
     }
 
+    void loadEnvMap(Scene* scene, const std::string& filePath);
     void loadLight(Scene* scene, const std::string& filePath);
     entt::entity loadModel(Scene *scene, const std::string& filePath);
 
 private:
+
     entt::entity loadGLTFModel(Scene *scene, const std::string& filePath);
     void loadMatFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel);
     void loadMeshFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel, std::map<int, std::vector<std::pair<int, int>>>& meshMap);

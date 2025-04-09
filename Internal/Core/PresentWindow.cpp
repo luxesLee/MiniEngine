@@ -107,7 +107,7 @@ void PresentWindow::mouse_callback(GLFWwindow *window, double xposIn, double ypo
 
 void PresentWindow::mousebutton_callback(GLFWwindow *window, int button, int action, int mods)
 {
-    if (button == GLFW_MOUSE_BUTTON_LEFT) 
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) 
     {
         if (action == GLFW_PRESS) 
         {

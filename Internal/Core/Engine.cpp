@@ -36,6 +36,7 @@ void Engine::Resize()
     if(g_Camera->bResize)
     {
         renderer->Resize(g_Camera->screenWidth, g_Camera->screenHeight);
+
         g_Camera->bResize = false;
     }
 }
@@ -45,4 +46,5 @@ void Engine::InitializeModel()
     modelLoader->loadModel(scene.get(), g_Config->initModelPath);
     modelLoader->loadLight(scene.get(), "");
     scene->buildScene();
+    scene->InitFBO();
 }

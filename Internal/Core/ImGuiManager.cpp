@@ -34,18 +34,43 @@ void ImGuiManager::Render()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    RenderMainMenuBar();
+    RenderSettingWindow();
+
+
+    ImGui::Render();
+
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void ImGuiManager::RenderMainMenuBar()
+{
+    if(ImGui::BeginMainMenuBar())
     {
-        static float f = 0.0f;
-        static int counter = 0;
+        if(ImGui::BeginMenu("File"))
+        {
+            ImGui::EndMenu();
+        }
+        if(ImGui::BeginMenu("Edit"))
+        {
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+}
 
-        ImGui::Begin("Setting");                          // Create a window called "Hello, world!" and append into it.
-
-        if(ImGui::CollapsingHeader("Basic"), ImGuiTreeNodeFlags_DefaultOpen)
+void ImGuiManager::RenderSettingWindow()
+{
+    ImGui::SetNextWindowPos(ImVec2(0, 20));
+    ImGui::SetNextWindowSize(ImVec2(350, 200));
+    if(ImGui::Begin("Setting", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
+    {
+        if(ImGui::CollapsingHeader("Basic"))
         {
             // FPS
             ImGuiIO& io = ImGui::GetIO();
-            ImGui::Text("FPS: (%.1f)", io.Framerate);
+            ImGui::Text("FPS: %.1f", io.Framerate);
+            ImGui::Text("Per Frame cost: %.2f ms", 1000.0f / io.Framerate);
 
             // Renderdoc Button
             ImGui::Text("debug (RenderDoc):");
@@ -57,11 +82,12 @@ void ImGuiManager::Render()
         }
 
         // render
-        if(ImGui::CollapsingHeader("Render"), ImGuiTreeNodeFlags_DefaultOpen)
+        if(ImGui::CollapsingHeader("Render"))
         {
             ImGui::Text("Current rendering accum %d frames", g_Config->accumulateFrames);
             ImGui::Checkbox("Render BaseColor", &g_Config->bShadeBaseColor);
 
+            // Denoiser
             const char* Denoises[] = {"None", "SVGF", "OIDN", "OPTIX"};
             if(ImGui::BeginCombo("Current denoiser :", Denoises[g_Config->curDenoise]))
             {
@@ -80,12 +106,31 @@ void ImGuiManager::Render()
                 ImGui::EndCombo();
             }
 
+            // ToneMapping
+            const char* ToneMappings[] = {"None", "Linear", "ACES", "TonyMcMapface"};
+            if(ImGui::BeginCombo("Current ToneMapping :", ToneMappings[g_Config->curToneMapping]))
+            {
+                for(int i = 0; i < 4; i++)
+                {
+                    bool isSelected = g_Config->curToneMapping == i;
+                    if(ImGui::Selectable(ToneMappings[i], isSelected))
+                    {
+                        g_Config->curToneMapping = (ToneMappingType)i;
+                    }
+                    if(isSelected)
+                    {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
             ImGui::SliderInt("PathTracing Depth", &g_Config->maxRayTracingDepth, 1.0f, 8.0f);
 
         }
 
         // Camera
-        if(ImGui::CollapsingHeader("Camera"), ImGuiTreeNodeFlags_DefaultOpen)
+        if(ImGui::CollapsingHeader("Camera"))
         {
             ImGui::Text("Camera Position:(%.5f, %.5f, %.5f)", g_Camera->Position.x, g_Camera->Position.y, g_Camera->Position.z);
             ImGui::Text("Camera Front:(%.5f, %.5f, %.5f)", g_Camera->Front.x, g_Camera->Front.y, g_Camera->Front.z);
@@ -98,8 +143,4 @@ void ImGuiManager::Render()
 
         ImGui::End();
     }
-
-    ImGui::Render();
-
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

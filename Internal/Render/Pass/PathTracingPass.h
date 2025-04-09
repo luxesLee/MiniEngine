@@ -14,14 +14,4 @@ public:
 
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
     void Init();
-
-private:
-    void InitFBO();
-
-private:
-    GLuint pathTracingFBO;
-    GLuint pathTracingTexId;
-
-    GLuint accumFBO;
-    GLuint accumTexId;
 };

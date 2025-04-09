@@ -2,9 +2,46 @@
 
 out vec4 color;
 
+uniform int toneMappingType;
 uniform sampler2D imgTex;
 // uniform sampler3D LUT;
 
+#define None 0
+#define Linear 1
+#define ACES 2
+#define TonyMcMapface 3
+
+#define Gamma 2.2
+#define INVGamma 0.45454545
+vec3 LinearToSRGB(vec3 linearRGB)
+{
+    return pow(linearRGB, vec3(INVGamma));
+}
+
+// -----------------------------------------------------------
+
+vec3 LinearToneMapping(vec3 color)
+{
+    color = clamp(color, 0.0, 1.0f);
+    return LinearToSRGB(color);
+}
+
+// -----------------------------------------------------------
+
+vec3 ACESFilmicToneMapping(vec3 color)
+{
+	color *= 0.6f;
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	color = (color * (a * color + b)) / (color * (c * color + d) + e);
+	color = LinearToSRGB(color);
+	return clamp(color, 0.0f, 1.0f);
+}
+
+// -----------------------------------------------------------
 
 // //https://github.com/h3r2tic/tony-mc-mapface/blob/main/shader/tony_mc_mapface.hlsl
 // vec3 TonyMcMapface(vec3 color) 
@@ -17,20 +54,19 @@ uniform sampler2D imgTex;
 // 	return result;
 // }
 
-#define Gamma 2.2
-#define INVGamma 0.45454545
-vec3 LinearToSRGB(vec3 linearRGB)
-{
-    return pow(linearRGB, vec3(INVGamma));
-}
-
-vec3 LinearToneMapping(vec3 color)
-{
-    color = clamp(color, 0.0, 1.0f);
-    return LinearToSRGB(color);
-}
+// -----------------------------------------------------------
 
 void main()
 {
-    color = vec4(LinearToSRGB(texelFetch(imgTex, ivec2(gl_FragCoord.xy), 0).rgb), 1.0f);
+    switch(toneMappingType)
+    {
+    case Linear:
+        color = vec4(LinearToneMapping(texelFetch(imgTex, ivec2(gl_FragCoord.xy), 0).rgb), 1.0f);
+        return;
+    case ACES:
+        color = vec4(ACESFilmicToneMapping(texelFetch(imgTex, ivec2(gl_FragCoord.xy), 0).rgb), 1.0f);
+        return;
+    case TonyMcMapface:
+        return;
+    }
 }

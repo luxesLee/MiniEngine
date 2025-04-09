@@ -2,6 +2,7 @@
 #include "Core/Scene.h"
 #include "Core/Mesh.h"
 #include "Core/Texture.h"
+#include "Core/Image.h"
 #define TINYOBJLOADER_IMPLEMENTATION 
 #include <tiny_obj_loader.h>
 #include <string>
@@ -12,7 +13,23 @@
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
 
-void ModelLoader::loadLight(Scene* scene, const std::string& filePath)
+void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
+{
+    // Image image(filePath);
+    // if(image.isInit())
+    {
+        // Texture* envMapTex = new Texture(image.Width(), image.Height());
+
+        if(scene->envMap)
+        {
+            delete scene->envMap;
+            scene->envMap = nullptr;
+        }
+        // scene->envMap = envMapTex;
+    }
+}
+
+void ModelLoader::loadLight(Scene *scene, const std::string &filePath)
 {
     if(filePath.empty())
     {
@@ -98,16 +115,36 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
 {
     for(const auto& mat : gltfModel.materials)
     {
+        const tinygltf::PbrMetallicRoughness pbr = mat.pbrMetallicRoughness;
+
         Material material;
-        material.baseColor = vec3(mat.pbrMetallicRoughness.baseColorFactor[0], mat.pbrMetallicRoughness.baseColorFactor[1], mat.pbrMetallicRoughness.baseColorFactor[2]);
-        material.emission = vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
-        material.metallic = static_cast<float>(mat.pbrMetallicRoughness.metallicFactor);
-        material.opacity = static_cast<float>(mat.pbrMetallicRoughness.baseColorFactor[3]);
-        material.roughness = static_cast<float>(mat.pbrMetallicRoughness.roughnessFactor);
+
+        material.baseColor = Vec3((float)pbr.baseColorFactor[0], (float)pbr.baseColorFactor[1], (float)pbr.baseColorFactor[2]);
+        if (pbr.baseColorTexture.index > -1)
+            material.baseColorTexId = pbr.baseColorTexture.index + scene->textures.size();
+        
+        material.opacity = (float)pbr.baseColorFactor[3];
+
         material.alphaCutoff = static_cast<float>(mat.alphaCutoff);
-        material.normalmapTexID = mat.normalTexture.index + static_cast<int>(scene->textures.size());
-        if (mat.pbrMetallicRoughness.baseColorTexture.index > -1)
-            material.baseColorTexId = mat.pbrMetallicRoughness.baseColorTexture.index + scene->textures.size();
+
+        material.roughness = sqrtf((float)pbr.roughnessFactor);
+        material.metallic = (float)pbr.metallicFactor;
+        if (pbr.metallicRoughnessTexture.index > -1)
+            material.metallicRoughnessTexID = pbr.metallicRoughnessTexture.index + scene->textures.size();
+
+        material.normalmapTexID = mat.normalTexture.index + scene->textures.size();
+
+        material.emission = vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
+        if (mat.emissiveTexture.index > -1)
+            material.emissionmapTexID = mat.emissiveTexture.index + scene->textures.size();
+
+        if (mat.extensions.find("KHR_materials_transmission") != mat.extensions.end())
+        {
+            const auto& ext = mat.extensions.find("KHR_materials_transmission")->second;
+            if (ext.Has("transmissionFactor"))
+                material.specTrans = (float)(ext.Get("transmissionFactor").Get<double>());
+        }
+        
         scene->materials.push_back(material);
     }
 

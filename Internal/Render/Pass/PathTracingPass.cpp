@@ -3,9 +3,10 @@
 #include "Core/Scene.h"
 #include "Core/Shader.h"
 #include "Render/RenderResHelper.h"
+#include "core/Camera.h"
 #include <fg/FrameGraph.hpp>
 #include <fg/Blackboard.hpp>
-#include "core/Camera.h"
+
 
 GLuint vao;
 PathTracingPass::PathTracingPass()
@@ -17,16 +18,6 @@ PathTracingPass::PathTracingPass()
 
 PathTracingPass::~PathTracingPass()
 {
-    if(pathTracingFBO)
-    {
-        RenderResHelper::deleteFBO();
-    }
-
-    if(pathTracingTexId)
-    {
-        glDeleteTextures(1, &pathTracingTexId);
-    }
-
 
 }
 
@@ -38,9 +29,16 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
         return;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->pathTracingFBO);
+
+    if(g_Config->accumulateFrames == 1)
+    {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, accumTexId);
+    glBindTexture(GL_TEXTURE_2D, scene->accumTexId);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_BUFFER, scene->getVertTexId());
     glActiveTexture(GL_TEXTURE2);
@@ -66,58 +64,10 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
     shaderPathTracing->use();
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, pathTracingFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glBlitFramebuffer(0, 0, g_Camera->screenWidth, g_Camera->screenHeight, 0, 0, g_Camera->screenWidth, g_Camera->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 }
 
 void PathTracingPass::Init()
 {
-    if(pathTracingFBO)
-    {
-        glDeleteFramebuffers(1, &pathTracingFBO);
-    }
 
-    if(pathTracingTexId)
-    {
-        glDeleteTextures(1, &pathTracingTexId);
-    }
-
-    if(accumFBO)
-    {
-        glDeleteFramebuffers(1, &accumFBO);
-    }
-
-    InitFBO();
-}
-
-void PathTracingPass::InitFBO()
-{
-    // temporarily write
-    glGenFramebuffers(1, &pathTracingFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
-
-    glGenTextures(1, &pathTracingTexId);
-    glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    glGenTextures(1, &accumTexId);
-    glBindTexture(GL_TEXTURE_2D, accumTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, DrawBuffers);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    checkGLError();
 }

@@ -27,7 +27,7 @@ class Scene
 public:
     Scene() 
     {
-        sceneBvh = new Bvh(10.0f);
+        sceneBvh = new Bvh(10.0f, 64, true);
     }
     ~Scene()
     {
@@ -47,6 +47,10 @@ public:
                 delete textures[i];
                 textures[i] = nullptr;
             }
+        }
+        if(envMap)
+        {
+            delete envMap;
         }
     }
 
@@ -76,6 +80,7 @@ private:
     std::vector<mat4> transforms;
     std::vector<Texture*> textures;
     std::vector<unsigned char> textureMapsArray;
+    Texture* envMap;
 
     bool bDirty = false;
 
@@ -91,6 +96,14 @@ public:
     GLuint getEnvTexId() const {return envTex.texId;}
     GLuint getTransformTexId() const {return instanceTransformTex.texId;}
     GLuint getTextureArrayId() const {return textureArrayTex.texId;}
+
+    void InitFBO();
+    GLuint pathTracingFBO;
+    GLuint pathTracingTexId;
+    GLuint accumTexId;
+
+    GLuint toneMappingFBO;
+    GLuint toneMappingTexId;
 
 private:
     void UploadDataToGpu();

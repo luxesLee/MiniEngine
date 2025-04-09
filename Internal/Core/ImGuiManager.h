@@ -15,6 +15,11 @@ public:
     }
 
 private:
+    void RenderMainMenuBar();
+    void RenderSettingWindow();
+
+
+private:
     std::function<void(void)> captureFrameFunc;
 };
 

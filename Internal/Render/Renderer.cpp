@@ -74,8 +74,6 @@ void Renderer::Render(Scene *scene)
 void Renderer::Resize(uint32_t width, uint32_t height)
 {
     glViewport(0, 0, width, height);
-    pathTracingPass.Init();
-    toneMappingPass.Resize(width, height);
 }
 
 void Renderer::UpdateUBO()
@@ -121,5 +119,5 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
     }
 
     pathTracingPass.AddPass(fg, blackboard, scene);
-    // toneMappingPass.AddPass(fg);
+    toneMappingPass.AddPass(fg, blackboard, scene);
 }
