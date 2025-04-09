@@ -80,6 +80,8 @@ void ImGuiManager::Render()
                 ImGui::EndCombo();
             }
 
+            ImGui::SliderInt("PathTracing Depth", &g_Config->maxRayTracingDepth, 1.0f, 8.0f);
+
         }
 
         // Camera

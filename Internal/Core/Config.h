@@ -49,7 +49,7 @@ public:
 
     // render
     LightMode lightMode = LightMode::PathTracing;
-    int maxRayTracingDepth = 1;
+    int maxRayTracingDepth = 2;
     uint32_t accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;
     uint32_t texWidth = 2048, texHeight = 2048;

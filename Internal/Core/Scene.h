@@ -80,6 +80,7 @@ private:
     bool bDirty = false;
 
 public:
+    GLuint getAccumTexId() const {return accumTex.texId;}
     GLuint getVertTexId() const {return verticeTex.texId;}
     GLuint getIndiceTexId() const {return indicesTex.texId;}
     GLuint getNormalTexId() const {return normalTex.texId;}
@@ -95,6 +96,8 @@ private:
     void UploadDataToGpu();
 
 private:
+    GPUTexture accumTex;
+
     GPUTexture verticeTex;
 
     GPUTexture indicesTex;

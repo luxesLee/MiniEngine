@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 
 out vec4 color;
 out vec4 accum;
@@ -36,6 +36,7 @@ layout(binding = 1) uniform PathTracingUBO
 
 #define FLT_MAX 3.402823466e+38
 #define PI 3.1415926
+#define TWOPI 6.2831852
 #define INVPI 0.31830989161
 #define MIN_ROUGHNESS 0.03
 
@@ -57,6 +58,7 @@ struct HitInfo
     vec3 triUVW;
     vec2 barycentricUV;
     int  matID;
+    float t;
 };
 
 struct Medium
@@ -132,7 +134,6 @@ struct Light
 };
 
 // https://github.com/chris-wyman/GettingStartedWithRTXRayTracing/blob/master/05-AmbientOcclusion/Data/Tutorial05/hlslUtils.hlsli
-
 uint RNG_init(uint val0, uint val1, uint backoff)
 {
 	uint v0 = val0, v1 = val1, s0 = 0;
@@ -232,7 +233,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
 
                 // tuvw all components must be greater than 0
                 // and hit point need the closest one
-                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x < t)
+                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x < t && tuvw.x > ray.Tmin)
                 {
                     t = tuvw.x;
                     hitInfo.triIndice = indice;
@@ -319,6 +320,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     // Next we will compute the rest hitInfo
     // uv and normal need to read texture so just read once
     hitInfo.worldPosition = ray.origin + t * ray.direction;
+    hitInfo.t = t;
 
     vec2 uv0 = texelFetch(uvTex, hitInfo.triIndice.x).xy;
     vec2 uv1 = texelFetch(uvTex, hitInfo.triIndice.y).xy;
@@ -340,18 +342,21 @@ float TraceShadow(vec3 worldPos, Light lightInfo)
     ray2Light.origin = worldPos;
     ray2Light.direction = -lightInfo.direction.xyz;
     HitInfo hitInfoTemp;
+    // 此处有优化空间，仅需判断是否hit物体，无需计算最近，因为当前默认为方向光
     bool bAnyHit = TraceRay(ray2Light, hitInfoTemp);
     return bAnyHit ? 0.0f : 1.0f;
 }
 
 // from RTXGI Resampled Importance Sampling
-bool SampleLightRIS()
+bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightIndex, out float sampleWeight)
 {
     float totalWeights = 0.0f;
     float samplePDF = 0.0f;
-    for(int i = 0; i < lightNum; i++)
+    for(int i = 0; i < 1; i++)
     {
         // use RNG and get a random light
+        uint lightIndex = 1;
+        sampleWeight = 1.0f;
 
 
 
@@ -361,6 +366,7 @@ bool SampleLightRIS()
     {
         return false;
     }
+
 
     return true;
 }
@@ -447,8 +453,9 @@ Light GetLightData(int index)
     Light data;
     data.position = vec4(0.0f);
     // data.direction = vec4(0, -0.97f, -0.2431f, 0);
-    data.direction = vec4(0, -0.995f, -0.1f, 0);
-    data.color = vec4(7.15f, 6.33478f, 6.0917f, 6.5f);
+    data.direction = vec4(0, -0.98f, -0.2f, 0);
+    // data.direction = vec4(0, -0.95f, -0.31f, 0);
+    data.color = vec4(17.15f, 16.3478f, 16.0917f, 6.5f);
     return data;
 }
 
@@ -538,29 +545,86 @@ float GetSpecularBrdfProbability(vec3 diffuseAlbedo, vec3 specularF0)
     return clamp(probability, 0.1f, 0.9f);
 }
 
-vec3 GetCosHemisphereSample(vec3 hitNormal, inout uint rng)
+// Utility function to get a vector perpendicular to an input vector 
+// (from "Efficient Construction of Perpendicular Vectors Without Branching")
+vec3 GetPerpVector(vec3 u)
 {
-
-
-
-    return vec3(1.0f);
+    vec3 a = abs(u);
+    uint xm = ((a.x - a.y) < 0 && (a.x - a.z) < 0) ? 1 : 0;
+    uint ym = (a.y - a.z) < 0 ? (1 ^ xm) : 0;
+    uint zm = 1 ^ (xm | ym);
+    return cross(u, vec3(xm, ym, zm));
 }
 
-vec3 SampleGGX(vec3 hitNormal, float roughness, vec2 randVal)
+// 生成一个半球上符合余弦分布的样本（cos-weighted 重要性采样）
+vec3 GetCosHemisphereSample(vec3 hitNormal, vec2 randVec2)
 {
+    // 由hit点的法向生成切线和副切线方向
+    vec3 bitangent = GetPerpVector(hitNormal);
+    vec3 tangent = cross(bitangent, hitNormal);
+    // 计算随机样本的球极坐标
+    // 原推导：theta = cos^-1(sqrt(1 - randVec2.x))，此处为余弦分布的另一种推导，采样在单位球上
+    float r = sqrt(randVec2.x);
+    float phi = TWOPI * randVec2.y;
+    // 还原回笛卡尔坐标系
+    return tangent * r * cos(phi) + bitangent * r * sin(phi) + hitNormal * sqrt(1 - randVec2.x);
+}
 
-    return vec3(1.0f);
+// vec3 GetUniformHemisphereSample(vec3 hitNormal)
+// {
+
+// }
+
+vec3 GetImportanceGGXSample(vec3 hitNormal, float roughness, vec2 randVec2)
+{
+    float a2 = roughness * roughness;
+    a2 = a2 * a2;
+    float cosThetaH = sqrt(max(0.0f, (1.0f - randVec2.x) / ((a2 - 1.0f) * randVec2.x + 1)));
+    float sinThetaH = sqrt(max(0.0f, 1 - cosThetaH * cosThetaH));
+    float phiH = randVec2.y * TWOPI;
+
+    vec3 H = vec3(cos(phiH) * sinThetaH, sin(phiH) * sinThetaH, cosThetaH);
+
+    // GGX生成的半角向量H是基于切线空间的，因而需要转至世界空间
+    vec3 bitangent = GetPerpVector(hitNormal);
+    vec3 tangent = cross(bitangent, hitNormal);
+    vec3 sampleVec = bitangent * H.x + tangent * H.y + hitNormal * H.z;
+
+    return normalize(sampleVec);
+}
+
+vec3 OffsetRay(vec3 p, vec3 n) {
+    // 常量定义
+    const float origin = 1.0 / 32.0;
+    const float floatScale = 1.0 / 65536.0;
+    const float intScale = 256.0;
+
+    // 计算法线的整数部分
+    ivec3 of_i = ivec3(intScale * n.x, intScale * n.y, intScale * n.z);
+
+    // 根据法线调整位置
+    vec3 p_i = vec3(
+        intBitsToFloat(floatBitsToInt(p.x) + (p.x < 0.0 ? -of_i.x : of_i.x)),
+        intBitsToFloat(floatBitsToInt(p.y) + (p.y < 0.0 ? -of_i.y : of_i.y)),
+        intBitsToFloat(floatBitsToInt(p.z) + (p.z < 0.0 ? -of_i.z : of_i.z))
+    );
+
+    // 判断是否需要偏移并返回最终结果
+    return vec3(
+        abs(p.x) < origin ? p.x + floatScale * n.x : p_i.x,
+        abs(p.y) < origin ? p.y + floatScale * n.y : p_i.y,
+        abs(p.z) < origin ? p.z + floatScale * n.z : p_i.z
+    );
 }
 
 void main()
 {
-    // get a random init shading point
+    // 初始化随机数
     uint rng = RNG_init(uint(gl_FragCoord.x + gl_FragCoord.y * screenAndInvScreen.x), accumulateFrames, 16);
     vec2 offset = vec2(RNG_next(rng), RNG_next(rng));
     vec2 samplePixel = gl_FragCoord.xy + mix(vec2(-0.5f), vec2(0.5f), offset);
     vec2 ndcPixel = 2.0f * (samplePixel / screenAndInvScreen.xy) - 1.0f;
 
-    // from zNear to zFar
     vec4 start = invViewProjection * vec4(ndcPixel, 1.0f, 1.0f);
     start.xyz /= start.w;
     vec4 end = invViewProjection * vec4(ndcPixel, 0.0f, 1.0f);
@@ -575,56 +639,58 @@ void main()
     vec3 radiance = vec3(0);
     vec3 throughput = vec3(1.0f);
     float pdf = 1.0f;
-    // only take one bounce into consideration
-    for(int i = 0; i < maxDepth; i++)
+
+    for(int i = 0; true; i++)
     {
         HitInfo hitInfo;
         if(TraceRay(ray, hitInfo))
         {
             Material mat = GetMatrixData(hitInfo.matID, hitInfo.barycentricUV);
-            radiance = mat.baseColor;
-            color = vec4(radiance, 1.0f);
-            return;
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 
-            // avoid to trace rays for every lights, so need to find the most important one
             int lightIndex = 0;
             float lightWeight = 1.0f;
-            //if(SampleLightRIS())
+            // 避免对每个光源都进行追踪，因而选择最重要的一个，方法为重要性重采样RIS
+            // if(SampleLightRIS(rng, hitInfo.worldPosition, hitInfo.worldNormal, lightIndex, lightWeight))
             {
-                Light lightInfo = GetLightData(0);
-                // zero or one
+                Light lightInfo = GetLightData(lightIndex);
+                // 可见性，路径追踪中为0或1
                 float visibility = TraceShadow(hitInfo.worldPosition, lightInfo);
                 vec3 wi = normalize(-lightInfo.direction.xyz);
                 float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
-                // shade direct lighting
+                // 直接光
                 vec3 directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * NdotL;
 
-                // calculate the contribute to ori shading point
+                // 计算对原着色点的贡献
                 radiance += lightWeight * (directLighting + mat.emission) * throughput / pdf;
 
-                // we take the baseColor as output currently
-                // radiance = vec3(visibility, 0, 0);
+                // 调试输出
+                // if(i == maxDepth - 1)
+                // // if(i == 0)
+                // {
+                //     color = vec4(ray.origin + ray.direction * hitInfo.t, 1.0);
+                //     accum = vec4(hitInfo.t, 0, 0, 1.0f);
+                //     return;
+                // }
             }
 
-            // not need to compute the following bounce point weight
+            // 无须计算当前命中点生成的光线
             if(i == maxDepth - 1)
             {
                 break;
             }
 
-            // This wi equals viewDir for the bounce point
+            // 下一次射线入射方向 <=> 本次出射方向
             vec3 wi;
-
-            // sample Brdf to generate next ray
+            // 此处由Brdf随机计算此次光线的反射类型，也可以直接由材质确定反射类型
             float probSpecular = GetSpecularBrdfProbability(brdf.diffuseAlbedo, brdf.specularF0); 
             bool bDiffuse = RNG_next(rng) > probSpecular;
             if(bDiffuse)
             {
                 vec3 diffuseBrdf = brdf.diffuseAlbedo * INVPI;
-                // Diffuse model need to generate ray from cos hemisphere distribution
-                wi = GetCosHemisphereSample(hitInfo.worldNormal, rng);
+                // 漫反射的出射方向由cos-weighted采样得到
+                wi = GetCosHemisphereSample(hitInfo.worldNormal, vec2(RNG_next(rng), RNG_next(rng)));
 
                 float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f);
                 throughput *= diffuseBrdf * NdotL;
@@ -632,17 +698,18 @@ void main()
             }
             else
             {
-                // SampleGGX returns a normal in micro surface and we use this normal to generate the ray
-                vec3 H = SampleGGX(hitInfo.worldNormal, brdf.roughness, vec2(RNG_next(rng), RNG_next(rng)));
+                // 高光的出射方向使用GGX重要性采样获取
+                vec3 H = GetImportanceGGXSample(hitInfo.worldNormal, brdf.roughness, vec2(RNG_next(rng), RNG_next(rng)));
                 wi = reflect(-wo, H);
+                float roughness = max(brdf.roughness, 0.065);
 
                 vec3 F;
-                vec3 specularBrdf = SpecularBRDF(hitInfo.worldNormal, wo, wi, brdf.specularF0, brdf.roughness, F);
+                vec3 specularBrdf = SpecularBRDF(hitInfo.worldNormal, wo, wi, brdf.specularF0, roughness, F);
                 float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f);
 
                 throughput *= specularBrdf * NdotL;
 
-                float a = brdf.roughness * brdf.roughness;
+                float a = roughness * roughness;
                 float D = D_GGX(hitInfo.worldNormal, H, a);
                 float NdotH = clamp(dot(hitInfo.worldNormal, H), 0.0f, 1.0f);
                 float LdotH = clamp(dot(wi, H), 0.0f, 1.0f);
@@ -651,19 +718,19 @@ void main()
                 pdf *= samplePDF * probSpecular;
             }
 
-            // Modified Ray
-            // ray.origin;
+            // ray.origin = hitInfo.worldPosition + hitInfo.worldNormal * 0.03;
+            ray.origin = OffsetRay(hitInfo.worldPosition, hitInfo.worldNormal);
             ray.direction = wi;
-            ray.Tmin = 0;
+            ray.Tmin = 1e-2;
             ray.TMax = FLT_MAX;
         }
         else
         {
-            // hit nothing and texture EnvMap
-            // need to translate ray direction to uv coord
+            // 未在AS上找到任何hit物体，从环境贴图上采样
             //vec2 uv;
             //radiance += texture(envTex, uv).rgb * throughput / pdf;
-            radiance = vec3(0, 0, 0);
+            // 暂未读取环境贴图，赋默认值0
+            // radiance += vec3(1.0f, 1.0f, 1.0f);
             break;
         }
     }
@@ -671,10 +738,15 @@ void main()
     // accumulate previous one
     if(accumulateFrames > 1)
     {
-        //radiance += texelFetch(accumTex, ivec2(gl_FragCoord.xy)).rgb;
+        radiance += texelFetch(accumTex, ivec2(gl_FragCoord.xy), 0).rgb;
     }
     
+    if (any(isnan(radiance)) || any(isinf(radiance)))
+    {
+        radiance = vec3(1.0f, 0, 0);
+    }
+
     // output
+    color = vec4(radiance / accumulateFrames, 1.0f);
     accum = vec4(radiance, 1.0f);
-    color = vec4(radiance, 1.0f);
 }

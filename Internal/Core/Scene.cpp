@@ -1,4 +1,5 @@
 #include "Scene.h"
+#include "Camera.h"
 #include "Config.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
@@ -105,6 +106,15 @@ void Scene::UploadDataToGpu()
     // flag of path tracing
     if(g_Config->lightMode == LightMode::PathTracing)
     {
+        TextureInfo accumTexInfo(TextureType::Image2D,
+                                GL_RGBA32F,
+                                g_Camera->screenWidth,
+                                g_Camera->screenHeight,
+                                GL_RGBA,
+                                GL_FLOAT,
+                                (void*)0);
+        accumTex = RenderResHelper::generateGPUTexture(accumTexInfo);
+
         TextureInfo vertTexInfo(TextureType::Buffer, 
                                 vertices.size() * sizeof(vec3), 
                                 vertices.data(), 

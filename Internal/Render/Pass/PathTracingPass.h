@@ -13,7 +13,7 @@ public:
     ~PathTracingPass();
 
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    void Resize(uint32_t width, uint32_t height);
+    void Init();
 
 private:
     void InitFBO();
@@ -21,7 +21,7 @@ private:
 private:
     GLuint pathTracingFBO;
     GLuint pathTracingTexId;
-    GLuint accumTexId;
 
-    
+    GLuint accumFBO;
+    GLuint accumTexId;
 };

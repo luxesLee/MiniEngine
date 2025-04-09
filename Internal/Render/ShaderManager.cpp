@@ -5,8 +5,7 @@ void ShaderManager::InitShader()
 {
     shaderMap["TestShader"] = new Shader("Shaders/TestShader.vert", "Shaders/TestShader.frag");
     shaderMap["PathTracing"] = new Shader("Shaders/PostProcess.vert", "Shaders/PathTracing.frag");
-
-
+    shaderMap["ToneMapping"] = new Shader("Shaders/PostProcess.vert", "Shaders/ToneMapping.frag");
     
 }
 

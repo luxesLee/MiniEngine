@@ -10,6 +10,8 @@
 Renderer::Renderer(uint32_t width, uint32_t height)
 {
     g_ShaderManager.InitShader();
+
+
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
@@ -34,8 +36,11 @@ void Renderer::Render(Scene *scene)
         RenderDebugger::startFrameCapture();
     }
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // if(g_Config->accumulateFrames == 0)
+    // {
+    //     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    //     glClear(GL_COLOR_BUFFER_BIT);
+    // }
 
     FrameGraph fg;
     FrameGraphBlackboard blackboard;
@@ -69,7 +74,7 @@ void Renderer::Render(Scene *scene)
 void Renderer::Resize(uint32_t width, uint32_t height)
 {
     glViewport(0, 0, width, height);
-    pathTracingPass.Resize(width, height);
+    pathTracingPass.Init();
     toneMappingPass.Resize(width, height);
 }
 
