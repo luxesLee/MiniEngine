@@ -11,6 +11,10 @@ Renderer::Renderer(uint32_t width, uint32_t height)
 {
     g_ShaderManager.InitShader();
 
+    if(g_Config->curDenoise > 0)
+    {
+        denoisePass = CreateDenoisePass();
+    }
 
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
@@ -27,6 +31,17 @@ void Renderer::Update()
     // we will update ubo and complete the culling in this function
     UpdateUBO();
     DoCulling();
+
+    if(denoisePass && g_Config->curDenoise != denoisePass->GetType())
+    {
+        delete denoisePass;
+        denoisePass = CreateDenoisePass();
+    }
+    else if(!denoisePass && g_Config->curDenoise != DenoiseType::NONE)
+    {
+        denoisePass = CreateDenoisePass();
+    }
+
 }
 
 void Renderer::Render(Scene *scene)
@@ -63,6 +78,8 @@ void Renderer::Render(Scene *scene)
     // todo: rendergraph
     // fg.compile();
     // fg.execute();
+
+
 
     if(g_Config->bRenderdocCapture)
     {
@@ -118,6 +135,25 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
         glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(int), sizeof(int), &maxDepth);
     }
 
+    scene->curOutputTex = 1 - scene->curOutputTex;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[scene->curOutputTex], 0);
+
     pathTracingPass.AddPass(fg, blackboard, scene);
-    toneMappingPass.AddPass(fg, blackboard, scene);
+    if(g_Config->curToneMapping > 0)
+    {
+        toneMappingPass.AddPass(fg, blackboard, scene);
+    }
+
+    if(denoisePass)
+    {
+        denoisePass->AddPass(scene);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, g_Camera->screenWidth, g_Camera->screenHeight, 0, 0, g_Camera->screenWidth, g_Camera->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }

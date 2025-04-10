@@ -104,6 +104,25 @@ void Scene::prepareTexture()
 // 暂时这样写，后续用rendergraph
 void Scene::InitFBO()
 {
+    glGenFramebuffers(1, &outputFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, outputFBO);
+
+    glGenTextures(1, &outputTex[0]);
+    glBindTexture(GL_TEXTURE_2D, outputTex[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glGenTextures(1, &outputTex[1]);
+    glBindTexture(GL_TEXTURE_2D, outputTex[1]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+// ----------------------------------------------------------------------------
+
     glGenFramebuffers(1, &pathTracingFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
 
@@ -215,8 +234,8 @@ void Scene::UploadDataToGpu()
 
         TextureInfo textureArrayInfo(TextureType::Image3DTextureArray2D,
                                         GL_RGBA8,
-                                        2048,
-                                        2048,
+                                        g_Config->texWidth,
+                                        g_Config->texHeight,
                                         textures.size(),
                                         GL_RGBA,
                                         GL_UNSIGNED_BYTE,

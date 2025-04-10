@@ -1,6 +1,7 @@
 #pragma once
 #include "Pass/PathTracingPass.h"
 #include "Pass/ToneMappingPass.h"
+#include "Pass/IDenoisePass.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
@@ -30,6 +31,8 @@ private:
 private:
     PathTracingPass pathTracingPass;
     ToneMappingPass toneMappingPass;
+    IDenoisePass* denoisePass = nullptr;
+
     GLuint CommonUBO;
     GLuint PathTracingUBO;
 };

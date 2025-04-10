@@ -1,40 +1,47 @@
 #pragma once
 #include "Core/Config.h"
+#include "OpenImageDenoise/oidn.hpp"
+#include <vector>
+
+class Scene;
 
 class IDenoisePass
 {
 public:
     virtual ~IDenoisePass() = default;
-    virtual void AddPass() = 0;
+    virtual void AddPass(Scene* scene) = 0;
     virtual DenoiseType GetType() const = 0;
-};
-
-class DefaultDenoisePass : public IDenoisePass
-{
-public:
-    virtual void AddPass() {}
-    virtual DenoiseType GetType() const {return NONE;}
 };
 
 class SVGFDenoisePass : public IDenoisePass
 {
 public:
-    virtual void AddPass();
+    SVGFDenoisePass();
+
+    virtual void AddPass(Scene* scene);
     virtual DenoiseType GetType() const {return SVGF;}
 };
 
 class OIDNDenoisePass : public IDenoisePass
 {
 public:
-    virtual void AddPass();
+    OIDNDenoisePass();
+    ~OIDNDenoisePass();
+    virtual void AddPass(Scene* scene);
     virtual DenoiseType GetType() const {return ODIN;}
+
+private:
+    std::vector<float> inputFrameVec;
+    std::vector<float> outputFrameVec;
+    oidn::DeviceRef device;
+    oidn::FilterRef filter;
 };
 
 class OPTIXDenoisePass : public IDenoisePass
 {
 public:
-    virtual void AddPass();
+    virtual void AddPass(Scene* scene);
     virtual DenoiseType GetType() const {return OPTIX;}
 };
 
-
+IDenoisePass* CreateDenoisePass();

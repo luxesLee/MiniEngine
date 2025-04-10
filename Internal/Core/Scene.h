@@ -28,6 +28,7 @@ public:
     Scene() 
     {
         sceneBvh = new Bvh(10.0f, 64, true);
+        curOutputTex = 1;
     }
     ~Scene()
     {
@@ -98,6 +99,11 @@ public:
     GLuint getTextureArrayId() const {return textureArrayTex.texId;}
 
     void InitFBO();
+
+    GLuint outputFBO;
+    GLuint outputTex[2];
+    int curOutputTex;
+
     GLuint pathTracingFBO;
     GLuint pathTracingTexId;
     GLuint accumTexId;

@@ -64,7 +64,12 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
     shaderPathTracing->use();
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
+    checkGLError();
 
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->pathTracingFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene->outputFBO);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glBlitFramebuffer(0, 0, g_Camera->screenWidth, g_Camera->screenHeight, 0, 0, g_Camera->screenWidth, g_Camera->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 void PathTracingPass::Init()

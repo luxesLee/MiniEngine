@@ -60,8 +60,8 @@ public:
     int maxRayTracingDepth = 2;
     uint32_t accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;
-    ToneMappingType curToneMapping = ToneMappingType::ACES;
-    uint32_t texWidth = 2048, texHeight = 2048;
+    ToneMappingType curToneMapping = ToneMappingType::Linear;
+    uint32_t texWidth = 512, texHeight = 512;
 
     // action
     bool bRenderdocCapture = false;
