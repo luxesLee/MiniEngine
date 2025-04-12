@@ -67,10 +67,11 @@ void PresentWindow::processInput()
 
 void PresentWindow::framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    g_Camera->screenWidth = width;
+    g_Config->wholeWidth = width;
+    g_Camera->screenWidth = width - g_Config->imguiWidth;
     g_Camera->screenHeight = height;
     g_Camera->bResize = true;
-    g_Config->screenWidth = width;
+    g_Config->screenWidth = width - g_Config->imguiWidth;
     g_Config->screenHeight = height;
     g_Config->accumulateFrames = 0;
 }

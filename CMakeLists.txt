@@ -42,6 +42,8 @@ set(OIDN_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/External/oidn/include)
 set(OIDN_LIB "${CMAKE_SOURCE_DIR}/External/oidn/lib")
 set(OIDN_LIBRARIES ${CMAKE_SOURCE_DIR}/External/oidn/lib/OpenImageDenoise.lib)
 
+set(JSON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/External/json/nlohmann)
+
 set(RENDERDOC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/renderdoc")
 
 include_directories(
@@ -59,6 +61,7 @@ include_directories(
     ${RENDERDOC_DIR}
     ${STB_INCLUDE_DIR}
     ${OIDN_INCLUDE_DIR}
+    ${JSON_INCLUDE_DIR}
     )
 
 

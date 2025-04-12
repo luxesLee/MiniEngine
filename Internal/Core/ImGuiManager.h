@@ -16,6 +16,8 @@ public:
 
 private:
     void RenderMainMenuBar();
+    void RenderOpenDialog();
+
     void RenderSettingWindow();
 
 

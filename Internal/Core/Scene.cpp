@@ -5,7 +5,7 @@
 #include "stb_image_resize.h"
 #include "stb_image.h"
 
-void Scene::buildScene()
+void Scene::BuildScene()
 {
     if(g_Config->lightMode == LightMode::PathTracing)
     {
@@ -22,6 +22,11 @@ void Scene::buildScene()
 
 
     UploadDataToGpu();
+}
+
+void Scene::CleanScene()
+{
+    
 }
 
 void Scene::createTLAS()
@@ -109,14 +114,14 @@ void Scene::InitFBO()
 
     glGenTextures(1, &outputTex[0]);
     glBindTexture(GL_TEXTURE_2D, outputTex[0]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenTextures(1, &outputTex[1]);
     glBindTexture(GL_TEXTURE_2D, outputTex[1]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGB, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -128,7 +133,7 @@ void Scene::InitFBO()
 
     glGenTextures(1, &pathTracingTexId);
     glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
@@ -136,7 +141,7 @@ void Scene::InitFBO()
 
     glGenTextures(1, &accumTexId);
     glBindTexture(GL_TEXTURE_2D, accumTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
@@ -146,7 +151,6 @@ void Scene::InitFBO()
     glDrawBuffers(2, DrawBuffers);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    checkGLError();
 
 // ----------------------------------------------------------------------------
 
@@ -155,7 +159,7 @@ void Scene::InitFBO()
 
     glGenTextures(1, &toneMappingTexId);
     glBindTexture(GL_TEXTURE_2D, toneMappingTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Camera->screenWidth, g_Camera->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, toneMappingTexId, 0);
@@ -164,20 +168,25 @@ void Scene::InitFBO()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Scene::DeleteFBO()
+{
+    glDeleteFramebuffers(1, &outputFBO);
+    glDeleteTextures(1, &outputTex[0]);
+    glDeleteTextures(1, &outputTex[1]);
+
+    glDeleteFramebuffers(1, &pathTracingFBO);
+    glDeleteTextures(1, &pathTracingTexId);
+    glDeleteTextures(1, &accumTexId);
+
+    glDeleteFramebuffers(1, &toneMappingFBO);
+    glDeleteTextures(1, &toneMappingTexId);
+}
+
 void Scene::UploadDataToGpu()
 {
     // flag of path tracing
     if(g_Config->lightMode == LightMode::PathTracing)
     {
-        TextureInfo accumTexInfo(TextureType::Image2D,
-                                GL_RGBA32F,
-                                g_Camera->screenWidth,
-                                g_Camera->screenHeight,
-                                GL_RGBA,
-                                GL_FLOAT,
-                                (void*)0);
-        accumTex = RenderResHelper::generateGPUTexture(accumTexInfo);
-
         TextureInfo vertTexInfo(TextureType::Buffer, 
                                 vertices.size() * sizeof(vec3), 
                                 vertices.data(), 

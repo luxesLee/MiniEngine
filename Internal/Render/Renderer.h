@@ -12,13 +12,18 @@ class Scene;
 class Renderer
 {
 public:
-    Renderer() {}
-    Renderer(uint32_t width, uint32_t height);
-    ~Renderer() {}
+    Renderer();
+    ~Renderer() 
+    {
+        if(denoisePass)
+        {
+            delete denoisePass;
+        }
+    }
 
     void Update();
     void Render(Scene* scene);
-    void Resize(uint32_t width, uint32_t height);
+    void Resize();
 
 private:
     void UpdateUBO();

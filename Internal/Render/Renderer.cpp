@@ -7,7 +7,7 @@
 #include <fg/FrameGraph.hpp>
 #include <fg/Blackboard.hpp>
 
-Renderer::Renderer(uint32_t width, uint32_t height)
+Renderer::Renderer()
 {
     g_ShaderManager.InitShader();
 
@@ -16,6 +16,7 @@ Renderer::Renderer(uint32_t width, uint32_t height)
         denoisePass = CreateDenoisePass();
     }
 
+    glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
@@ -88,9 +89,9 @@ void Renderer::Render(Scene *scene)
     }
 }
 
-void Renderer::Resize(uint32_t width, uint32_t height)
+void Renderer::Resize()
 {
-    glViewport(0, 0, width, height);
+    glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
 }
 
 void Renderer::UpdateUBO()
@@ -115,6 +116,7 @@ void Renderer::DoCulling()
 
 void Renderer::ForwardRendering()
 {
+    
 }
 
 void Renderer::DeferredRendering()
@@ -155,5 +157,5 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, g_Camera->screenWidth, g_Camera->screenHeight, 0, 0, g_Camera->screenWidth, g_Camera->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }

@@ -1,11 +1,10 @@
 #pragma once
-#include <glad/glad.h>
-#include <glm.hpp>
-#include <gtc/matrix_transform.hpp>
 #include <algorithm>
+#include "glad/glad.h"
+#include "glm.hpp"
+#include "gtc/matrix_transform.hpp"
 #include "Config.h"
 
-// Defines several possible options for camera movement. Used as abstraction to stay away from window-system specific input methods
 enum Camera_Movement {
     FORWARD,
     BACKWARD,
@@ -13,24 +12,21 @@ enum Camera_Movement {
     RIGHT
 };
 
-// An abstract camera class that processes input and calculates the corresponding Euler Angles, Vectors and Matrices for use in OpenGL
 class Camera
 {
 public:
-    // camera Attributes
     glm::vec3 Position;
     glm::vec3 Front;
     glm::vec3 Up;
     glm::vec3 Right;
 
-    // camera options
     uint32_t screenWidth;
     uint32_t screenHeight;
     bool bResize;
 
     static Camera* getInstance()
     {
-        static Camera instance(g_Config->initCameraPos, g_Config->initCameraLookAt, g_Config->initCameraZoom);
+        static Camera instance(glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), 45.0);
         return &instance;
     }
 
@@ -42,9 +38,20 @@ private:
 
 private:
     // constructor with vectors
-    Camera(glm::vec3 _position, glm::vec3 lookat, double _zoom) 
-        : Position(_position), Zoom(_zoom), bResize(false)
+    Camera(glm::vec3 _position, glm::vec3 _lookat, double _zoom) 
+        : bResize(false)
     {
+        UpdateCameraParamters(_position, _lookat, _zoom);
+    }
+
+    Camera(const Camera&) = delete;
+    Camera& operator=(const Camera&) = delete;
+
+public:
+    void UpdateCameraParamters(glm::vec3 position, glm::vec3 lookat, double zoom)
+    {
+        Position = position;
+        Zoom = zoom;
         glm::vec3 dir = lookat - Position;
         pitch = glm::degrees(asin(dir.y));
         yaw = glm::degrees(atan2(dir.z, dir.x));
@@ -52,10 +59,6 @@ private:
         updateCameraVectors();
     }
 
-    Camera(const Camera&) = delete;
-    Camera& operator=(const Camera&) = delete;
-
-public:
     // returns the view matrix calculated using Euler Angles and the LookAt Matrix
     glm::mat4 GetViewMatrix()
     {

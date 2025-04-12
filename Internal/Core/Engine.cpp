@@ -6,28 +6,24 @@
 Engine::Engine()
 {
     modelLoader = std::make_unique<ModelLoader>(reg);
-    renderer = std::make_unique<Renderer>(g_Camera->screenWidth, g_Camera->screenHeight);
+    renderer = std::make_unique<Renderer>();
     scene = std::make_unique<Scene>();
-    InitializeModel();
 }
 
 Engine::~Engine()
 {
     modelLoader.reset();
+    scene->CleanScene();
 }
 
 void Engine::Update()
 {
-    if(scene->getSceneDirty())
-    {
-        InitializeModel();
-    }
-
     Resize();
+    renderer->Update();    
+}
 
-    static Timer timer;
-    float dt = timer.MarkInSeconds();
-    renderer->Update();
+void Engine::Render()
+{
     renderer->Render(scene.get());
 }
 
@@ -35,16 +31,32 @@ void Engine::Resize()
 {
     if(g_Camera->bResize)
     {
-        renderer->Resize(g_Camera->screenWidth, g_Camera->screenHeight);
-
+        renderer->Resize();
+        scene->DeleteFBO();
+        scene->InitFBO();
         g_Camera->bResize = false;
     }
 }
 
-void Engine::InitializeModel()
+void Engine::UpdateScene(const SceneConfig& config)
 {
-    modelLoader->loadModel(scene.get(), g_Config->initModelPath);
-    modelLoader->loadLight(scene.get(), "");
-    scene->buildScene();
+    scene->CleanScene();
+
+    for(const auto& modelConfig : config.modelConfigs)
+    {
+        modelLoader->loadModel(scene.get(), modelConfig, config.matConfigMap);
+    }
+
+    for(auto& light : config.lightConfigs)
+    {
+        scene->AppendLight(Light(light));
+    }
+
+    if(config.envMapConfig.envMapPath.size() > 0)
+    {
+        modelLoader->loadEnvMap(scene.get(), config.envMapConfig.envMapPath);
+    }
+
+    scene->BuildScene();
     scene->InitFBO();
 }

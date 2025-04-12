@@ -2,6 +2,7 @@
 #include <entt.hpp>
 #include <memory>
 #include "Util/ModelLoader.h"
+#include "Util/ConfigLoader.h"
 #include "Render/Renderer.h"
 #include "Scene.h"
 
@@ -12,10 +13,12 @@ public:
     ~Engine();
 
     void Update();
+    void Render();
+    
     void Resize();
 
-private:
-    void InitializeModel();
+    void UpdateScene(const SceneConfig& config);
+
 
 private:
     entt::registry reg;
@@ -23,4 +26,7 @@ private:
     std::unique_ptr<Renderer> renderer;
     std::unique_ptr<Scene> scene;
     // todo: physical engine
+
+
+    
 };

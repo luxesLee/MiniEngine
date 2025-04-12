@@ -1,0 +1,83 @@
+{
+    "camera": {
+      "position": [
+        0.276,
+        0.275,
+        -0.75
+      ],
+      "look_at": [
+        0.276,
+        0.275,
+        0.1
+      ],
+      "zoom": 40.0,
+      "near": 0.01,
+      "far": 10.0
+    },
+    "models": [
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_ceiling.obj",
+        "translation" : [0.278, 0.5488, 0.27955],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "white"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_floor.obj",
+        "translation" : [0.2756, 0, 0.2796],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "white"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_back.obj",
+        "translation" : [0.2764, 0.2744, 0.5592],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "white"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_smallbox.obj",
+        "translation" : [0.1855, 0.0835, 0.169],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "white"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_largebox.obj",
+        "translation" : [0.3685, 0.166, 0.35125],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "white"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_greenwall.obj",
+        "translation" : [0.0, 0.2744, 0.2796],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "green"
+      },
+      {
+        "path": "../../Resource/Model/Cornell_box/cbox_redwall.obj",
+        "translation" : [0.5536, 0.2744, 0.2796],
+        "scale": [ 0.01, 0.01, 0.01 ],
+        "material": "red"
+      }
+    ],
+    "lights": [
+        {
+          "type": "quad",
+          "position": [ 0.34299999, 0.54779997, -0.22700010 ],
+          "color": [17.0, 12.0, 4.0],
+          "vertex": [
+                [0.34299999, 0.54779997, 0.33200008] ,
+                [0.21300001, 0.54779997, 0.22700010]
+            ]
+        }
+    ],
+    "materials": {
+        "white": {
+            "color": [0.725, 0.71, 0.68]
+        },
+        "red": {
+            "color": [0.63, 0.065, 0.05]
+        },
+        "green": {
+            "color": [0.14, 0.45, 0.091]
+        }
+    }
+}

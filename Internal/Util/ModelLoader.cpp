@@ -29,28 +29,7 @@ void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
     }
 }
 
-void ModelLoader::loadLight(Scene *scene, const std::string &filePath)
-{
-    if(filePath.empty())
-    {
-        // load a default light
-        Light light;
-        light.position = vec4(0, 0, 0, 0);
-        light.direction = vec4(0, -0.9563, -0.2924, 0);
-        light.color = vec4(7.15, 633478, 6.0917, 6.5);
-        light.active = 1;
-        light.range = 100;
-        light.type = DIRECTIONAL_LIGHT;
-        light.outerCosine = 0.707;
-        light.innerCosine = 0.9238;
-        light.volumetric = 1;
-        light.volumetricStrength = 0.004;
-        light.useCascades = 1;
-        scene->lights.push_back(light);
-    }
-}
-
-entt::entity ModelLoader::loadModel(Scene *scene, const std::string& filePath)
+entt::entity ModelLoader::loadModel(Scene *scene, const ModelConfig& modelConfig, const MaterialConfigMap& matConfigMap)
 {
     auto endsWith = [=](const std::string& str, const std::string& compare)
     {
@@ -67,18 +46,19 @@ entt::entity ModelLoader::loadModel(Scene *scene, const std::string& filePath)
         return n2 < 0;
     };
 
-    if(endsWith(filePath, ".obj"))
+    if(endsWith(modelConfig.modelPath, ".obj"))
     {
-        return loadOBJModel();
+        loadOBJModel(scene, modelConfig, matConfigMap);
+        return entt::null;
     }
-    else if(endsWith(filePath, ".gltf"))
+    else if(endsWith(modelConfig.modelPath, ".gltf"))
     {
-        return loadGLTFModel(scene, filePath);
+        return loadGLTFModel(scene, modelConfig.modelPath, modelConfig.transform);
     }
     return entt::null;
 }
 
-entt::entity ModelLoader::loadGLTFModel(Scene *scene, const std::string& filePath)
+entt::entity ModelLoader::loadGLTFModel(Scene *scene, const std::string& filePath, const glm::mat4& transform)
 {
     tinygltf::TinyGLTF loader;
     tinygltf::Model gltfModel;
@@ -105,7 +85,7 @@ entt::entity ModelLoader::loadGLTFModel(Scene *scene, const std::string& filePat
     loadMeshFromGLTFModel(scene, gltfModel, meshMap);
     loadMatFromGLTFModel(scene, gltfModel);
     loadTexturesFromGLTFModel(scene, gltfModel);
-    loadInstanceFromGLTFModel(scene, gltfModel, meshMap);
+    loadInstanceFromGLTFModel(scene, gltfModel, meshMap, transform);
 
     // entt::entity entityModel = reg.create();
     return entt::null;
@@ -272,7 +252,7 @@ void ModelLoader::loadTexturesFromGLTFModel(Scene *scene, tinygltf::Model& gltfM
     }
 }
 
-void ModelLoader::loadInstanceFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel, std::map<int, std::vector<std::pair<int, int>>>& meshMap)
+void ModelLoader::loadInstanceFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel, std::map<int, std::vector<std::pair<int, int>>>& meshMap, const glm::mat4& transform)
 {
     std::function<void(int, mat4&)> travelNodes = [&](int nodeId, mat4& parentMat)
     {
@@ -319,7 +299,7 @@ void ModelLoader::loadInstanceFromGLTFModel(Scene *scene, tinygltf::Model& gltfM
         }
     };
     
-    mat4 xform = mat4(1.0f);
+    mat4 xform = transform;
     const auto gltfScene = gltfModel.scenes[gltfModel.defaultScene];
     for(int rootId = 0; rootId < gltfScene.nodes.size(); rootId++)
     {
@@ -327,15 +307,14 @@ void ModelLoader::loadInstanceFromGLTFModel(Scene *scene, tinygltf::Model& gltfM
     }
 }
 
-entt::entity ModelLoader::loadOBJModel()
+entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelConfig, const MaterialConfigMap& matConfigMap)
 {
-    std::string filePath;
     std::string err, warn;   
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
 
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filePath.c_str());
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, modelConfig.modelPath.c_str());
     if(!ret || !err.empty())
     {
         if(!err.empty())
@@ -349,8 +328,59 @@ entt::entity ModelLoader::loadOBJModel()
         std::cout << "TINYGLTF Warn: " << warn << std::endl;
     }
 
-    entt::entity entityModel = reg.create();
+    bool bMatAlreadyLoad = false;
+    if(modelConfig.materialName != "" && matConfigMap.count(modelConfig.materialName))
+    {
+        bMatAlreadyLoad = true;
+        scene->materials.push_back((matConfigMap.find(modelConfig.materialName))->second.mat);
+    }
 
+    // OBJ格式无实例概念
+    for(int i = 0; i < shapes.size(); i++)
+    {
+        const auto& objMesh = shapes[i].mesh;
+        Mesh* mesh = new Mesh();
 
-    return entityModel;
+        int indexOffset = 0;
+        for(int f = 0; f < objMesh.num_face_vertices.size(); f++)
+        {
+            for(int v = 0; v < 3; v++)
+            {
+                auto idx = objMesh.indices[indexOffset + v];
+                mesh->vertices.push_back({attrib.vertices[3 * idx.vertex_index], 
+                                            attrib.vertices[3 * idx.vertex_index + 1],
+                                            attrib.vertices[3 * idx.vertex_index + 2]});
+                
+                if(idx.normal_index >= 0)
+                {
+                    mesh->normals.push_back({attrib.normals[3 * idx.normal_index], 
+                                                attrib.normals[3 * idx.normal_index + 1],
+                                                attrib.normals[3 * idx.normal_index + 2]});
+                }
+
+                if(idx.texcoord_index >= 0)
+                {
+                    mesh->uvs.push_back({attrib.texcoords[2 * idx.texcoord_index], 
+                                            attrib.normals[2 * idx.texcoord_index + 1]});
+                }
+            }
+            indexOffset += 3;
+        }
+        scene->meshes.push_back(mesh);
+        MeshInstance meshInstance(scene->meshes.size() - 1, 
+                                scene->materials.size() - 1 + (bMatAlreadyLoad ? 0 : objMesh.material_ids[0]), 
+                                modelConfig.transform);
+                                // glm::mat4(1.0f));
+        scene->meshInstances.push_back(meshInstance);
+    }
+
+    // for(int i = 0; i < materials.size(); i++)
+    // {
+    //     Material material;
+    //     const auto& objMat = materials[i];
+    //     //material.baseColor = objMat.        
+    //     scene->materials.push_back(material);
+    // }
+
+    return entt::null;
 }

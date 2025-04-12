@@ -1,0 +1,27 @@
+{
+    "camera": {
+      "position": [
+        7.72,
+        2.5,
+        -1.0
+      ],
+      "look_at": [
+        6.72,
+        2.5,
+        -1.0
+      ],
+      "zoom": 45.0,
+      "near": 1.0,
+      "far": 700.0
+    },
+    "skybox": {
+      "texture": [ "Resources/Textures/Skybox/sunsetcube1024.dds" ]
+    },
+    "models": [
+      {
+        "path": "../../Resource/Model/Sponza/glTF/Sponza.gltf",
+        "scale": [ 1.0, 1.0, 1.0 ]
+      }
+    ]
+
+}

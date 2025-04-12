@@ -19,11 +19,10 @@ private:
     App() = default;
     ~App() = default;
 
-    void BindImGUICallbackFunction();
+    void ReloadConfig();
 
 private:
     std::unique_ptr<ImGuiManager> imguiManager = nullptr;
     std::unique_ptr<PresentWindow> window = nullptr;
     std::unique_ptr<Engine> engine = nullptr;
-
 };

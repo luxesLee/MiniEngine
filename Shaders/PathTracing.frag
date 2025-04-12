@@ -124,12 +124,8 @@ struct Light
     int type;
     float outerCosine;
     float innerCosine;
-    int     volumetric;
-	float   volumetricStrength;
-	int     useCascades;
-	int     shadowTextureIndex;
-	int     shadowMatrixIndex;
-    int     shadowMaskIndex;
+    vec3 u;
+    vec3 v;
     int     padd;
 };
 
@@ -180,7 +176,7 @@ float AABBIntersect(vec3 pmin, vec3 pmax, Ray ray)
     return (t1 >= t0) ? (t0 > 0.0f ? t0 : t1) : -1.0f;
 }
 
-#define EPS 0.01
+#define EPS 0.001
 bool TraceRay(Ray ray, out HitInfo hitInfo)
 {
     // 1. Search in TLAS and store the possible index in stack 
@@ -474,7 +470,6 @@ bool TraceShadowRay(Ray ray)
     return false;
 }
 
-// from pos to light pos whether any hinders
 float TraceShadow(vec3 worldPos, Light lightInfo)
 {
     Ray ray2Light;
@@ -761,6 +756,7 @@ void main()
     vec2 samplePixel = gl_FragCoord.xy + mix(vec2(-0.5f), vec2(0.5f), offset);
     vec2 ndcPixel = 2.0f * (samplePixel / screenAndInvScreen.xy) - 1.0f;
 
+    // Inverse深度缓冲，此处1代表近平面，0代表原平面
     vec4 start = invViewProjection * vec4(ndcPixel, 1.0f, 1.0f);
     start.xyz /= start.w;
     vec4 end = invViewProjection * vec4(ndcPixel, 0.0f, 1.0f);
@@ -805,8 +801,8 @@ void main()
                 // if(i == maxDepth - 1)
                 // if(i == 0)
                 // {
-                //     color = vec4(radiance, 1.0);
-                //     accum = vec4(hitInfo.t, 0, 0, 1.0f);
+                //     color = vec4(hitInfo.worldPosition, 1.0);
+                //     // accum = vec4(hitInfo.t, 0, 0, 1.0f);
                 //     return;
                 // }
             }

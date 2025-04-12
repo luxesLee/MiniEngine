@@ -37,7 +37,6 @@ void ImGuiManager::Render()
     RenderMainMenuBar();
     RenderSettingWindow();
 
-
     ImGui::Render();
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -49,20 +48,30 @@ void ImGuiManager::RenderMainMenuBar()
     {
         if(ImGui::BeginMenu("File"))
         {
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Edit"))
-        {
+            if(ImGui::MenuItem("Open", "Ctrl+O"))
+            {
+                RenderOpenDialog();
+            }
+            if(ImGui::MenuItem("Dump"))
+            {
+
+            }
+
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
     }
 }
 
+void ImGuiManager::RenderOpenDialog()
+{
+    
+}
+
 void ImGuiManager::RenderSettingWindow()
 {
     ImGui::SetNextWindowPos(ImVec2(0, 20));
-    ImGui::SetNextWindowSize(ImVec2(350, 200));
+    ImGui::SetNextWindowSize(ImVec2(g_Config->imguiWidth, g_Config->screenHeight - 20));
     if(ImGui::Begin("Setting", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
     {
         if(ImGui::CollapsingHeader("Basic"))

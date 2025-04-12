@@ -55,9 +55,17 @@ public:
         }
     }
 
-    void buildScene();
-    int getTopBVHIndex() const {return bvhTranslator.topLevelIndex;}
-    bool getSceneDirty() const {return bDirty;}
+    void BuildScene();
+    void CleanScene();
+
+    int getTopBVHIndex() const 
+    {
+        return bvhTranslator.topLevelIndex;
+    }
+    void AppendLight(Light& light)
+    {
+        lights.push_back(light);
+    }
 
 private:
     void createTLAS();
@@ -83,10 +91,7 @@ private:
     std::vector<unsigned char> textureMapsArray;
     Texture* envMap;
 
-    bool bDirty = false;
-
 public:
-    GLuint getAccumTexId() const {return accumTex.texId;}
     GLuint getVertTexId() const {return verticeTex.texId;}
     GLuint getIndiceTexId() const {return indicesTex.texId;}
     GLuint getNormalTexId() const {return normalTex.texId;}
@@ -99,6 +104,7 @@ public:
     GLuint getTextureArrayId() const {return textureArrayTex.texId;}
 
     void InitFBO();
+    void DeleteFBO();
 
     GLuint outputFBO;
     GLuint outputTex[2];
@@ -115,25 +121,14 @@ private:
     void UploadDataToGpu();
 
 private:
-    GPUTexture accumTex;
-
     GPUTexture verticeTex;
-
     GPUTexture indicesTex;
-
     GPUTexture normalTex;
-
     GPUTexture uvsTex;
-
     GPUTexture lightTex;
-
     GPUTexture matTex;
-
     GPUTexture instanceTransformTex;
-
     GPUTexture bvhTex;
-
     GPUTexture envTex;
-
     GPUTexture textureArrayTex;
 };

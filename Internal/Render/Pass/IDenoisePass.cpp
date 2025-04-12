@@ -35,8 +35,8 @@ void OIDNDenoisePass::AddPass(Scene *scene)
     glBindTexture(GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex]);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, inputFrameVec.data());
 
-    filter.setImage("color", inputFrameVec.data(), oidn::Format::Float3, g_Config->screenWidth, g_Config->screenHeight);
-    filter.setImage("output", outputFrameVec.data(), oidn::Format::Float3, g_Config->screenWidth, g_Config->screenHeight);
+    filter.setImage("color", inputFrameVec.data(), oidn::Format::Float3, g_Config->wholeWidth, g_Config->screenHeight);
+    filter.setImage("output", outputFrameVec.data(), oidn::Format::Float3, g_Config->wholeWidth, g_Config->screenHeight);
     filter.set("hdr", false);
     filter.commit();
 
@@ -50,7 +50,7 @@ void OIDNDenoisePass::AddPass(Scene *scene)
     }
 
     glBindTexture(GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex]);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGB, GL_FLOAT, outputFrameVec.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGB, GL_FLOAT, outputFrameVec.data());
 }
 
 IDenoisePass *CreateDenoisePass()
