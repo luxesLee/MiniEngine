@@ -22,6 +22,13 @@
         "path": "../../Resource/Model/Sponza/glTF/Sponza.gltf",
         "scale": [ 1.0, 1.0, 1.0 ]
       }
-    ]
-
+    ],
+    "lights": [
+      {
+        "type": "directional",
+        "position": [ 0, 0, 0 ],
+        "direction": [0, -0.98, -0.2],
+        "color": [17.15, 16.3478, 16.0917]
+      }
+  ]
 }

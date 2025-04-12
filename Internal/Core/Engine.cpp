@@ -49,7 +49,14 @@ void Engine::UpdateScene(const SceneConfig& config)
 
     for(auto& light : config.lightConfigs)
     {
-        scene->AppendLight(Light(light));
+        if(light.type == QUAD_LIGHT)
+        {
+            scene->AppendEmissionMesh(light);
+        }
+        else
+        {
+            scene->AppendLight(Light(light));
+        }
     }
 
     if(config.envMapConfig.envMapPath.size() > 0)

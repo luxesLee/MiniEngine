@@ -114,6 +114,10 @@ struct Brdf
     float roughness;
 };
 
+#define DIRECTIONAL 0
+#define POINT 1
+#define SPOT 2
+#define QUAD 3
 struct Light
 {
     vec4 position;
@@ -126,8 +130,38 @@ struct Light
     float innerCosine;
     vec3 u;
     vec3 v;
-    int     padd;
+    int padd;
 };
+
+Light GetLightData(int index)
+{
+    int lightIndex = 6 * index;
+
+    Light data;
+    data.position = texelFetch(lightTex, lightIndex);
+    data.direction = texelFetch(lightTex, lightIndex + 1);
+    data.color = texelFetch(lightTex, lightIndex + 2);
+    
+    vec4 param4 = texelFetch(lightTex, lightIndex + 3);
+    vec4 param5 = texelFetch(lightTex, lightIndex + 4);
+    vec4 param6 = texelFetch(lightTex, lightIndex + 5);
+
+    data.bActive = floatBitsToInt(param4.x);
+    data.range = param4.y;
+    data.type = floatBitsToInt(param4.z);
+    data.outerCosine = param4.w;
+
+    data.innerCosine = param5.x;
+    data.u = param5.yzw;
+    data.v = param6.xyz;
+
+    if(data.type == QUAD)
+    {
+        data.direction.xyz = normalize(cross(data.u, data.v));
+    }
+
+    return data;
+}
 
 // https://github.com/chris-wyman/GettingStartedWithRTXRayTracing/blob/master/05-AmbientOcclusion/Data/Tutorial05/hlslUtils.hlsli
 uint RNG_init(uint val0, uint val1, uint backoff)
@@ -147,17 +181,6 @@ float RNG_next(inout uint s)
 {
 	s = (1664525u * s + 1013904223u);
 	return float(s & 0x00FFFFFF) / float(0x01000000);
-}
-
-Light GetLightData(int index)
-{
-    Light data;
-    data.position = vec4(0.0f);
-    // data.direction = vec4(0, -0.97f, -0.2431f, 0);
-    data.direction = vec4(0, -0.98f, -0.2f, 0);
-    // data.direction = vec4(0, -0.95f, -0.31f, 0);
-    data.color = vec4(17.15f, 16.3478f, 16.0917f, 6.5f);
-    return data;
 }
 
 float AABBIntersect(vec3 pmin, vec3 pmax, Ray ray)
@@ -474,19 +497,31 @@ float TraceShadow(vec3 worldPos, Light lightInfo)
 {
     Ray ray2Light;
     ray2Light.origin = worldPos;
-    ray2Light.direction = -lightInfo.direction.xyz;
-    bool bAnyHit = TraceShadowRay(ray2Light);
+    bool bAnyHit = false;
+    if(lightInfo.type == DIRECTIONAL)
+    {
+        ray2Light.direction = -lightInfo.direction.xyz;
+        bAnyHit = TraceShadowRay(ray2Light);
+    }
+    else if(lightInfo.type == POINT)
+    {
+        ray2Light.direction = normalize(lightInfo.position.xyz - worldPos);
+    }
+    else if(lightInfo.type == SPOT)
+    {
+
+    }
+
     return bAnyHit ? 0.0f : 1.0f;
 }
 
 // from RTXGI Resampled Importance Sampling
 #define RIS_CANDIDATES_LIGHTS 8
-bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightIndex, out float sampleWeight)
+bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightIndex, inout float sampleWeight)
 {
     float totalWeights = 0.0f;
     float samplePDF = 0.0f;
 
-    int lightNum = 1;
     int candidateMax = min(lightNum, RIS_CANDIDATES_LIGHTS);
     for(int i = 0; i < candidateMax; i++)
     {
@@ -781,10 +816,11 @@ void main()
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 
+            vec3 directLighting = vec3(0);
             int lightIndex = 0;
             float lightWeight = 1.0f;
             // 避免对每个光源都进行追踪，因而选择最重要的一个，方法为重要性重采样RIS
-            // if(SampleLightRIS(rng, hitInfo.worldPosition, hitInfo.worldNormal, lightIndex, lightWeight))
+            if(SampleLightRIS(rng, hitInfo.worldPosition, hitInfo.worldNormal, lightIndex, lightWeight))
             {
                 Light lightInfo = GetLightData(lightIndex);
                 // 可见性，路径追踪中为0或1
@@ -792,23 +828,23 @@ void main()
                 vec3 wi = normalize(-lightInfo.direction.xyz);
                 float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
                 // 直接光
-                vec3 directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * NdotL;
-
-                // 计算对原着色点的贡献
-                radiance += lightWeight * (directLighting + mat.emission) * throughput / pdf;
-
-                // 调试输出
-                // if(i == maxDepth - 1)
-                // if(i == 0)
-                // {
-                //     color = vec4(hitInfo.worldPosition, 1.0);
-                //     // accum = vec4(hitInfo.t, 0, 0, 1.0f);
-                //     return;
-                // }
+                directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * NdotL;
             }
+            // 计算对原着色点的贡献
+            radiance += lightWeight * (directLighting + mat.emission) * throughput / pdf;
 
+            // 调试输出
+            // if(i == maxDepth - 1)
+            // if(i == 0)
+            // {
+            //     color = vec4(lightWeight, 0, 0, 1.0);
+            //     // accum = vec4(hitInfo.t, 0, 0, 1.0f);
+            //     return;
+            // }
+
+            // 自发光物体视为光源
             // 无须计算当前命中点生成的光线
-            if(i == maxDepth - 1)
+            if(i == maxDepth - 1 || length(mat.emission) != 0)
             {
                 break;
             }
@@ -860,7 +896,7 @@ void main()
         {
             //radiance += texture(envTex, uv).rgb * throughput / pdf;
             // 暂未读取环境贴图，赋默认值
-            radiance += vec3(0.310f, 0.404f, 0.541f) * throughput / pdf;
+            // radiance += vec3(0.310f, 0.404f, 0.541f) * throughput / pdf;
             break;
         }
     }

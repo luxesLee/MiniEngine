@@ -62,10 +62,16 @@ public:
     {
         return bvhTranslator.topLevelIndex;
     }
+    int getLightNum() const 
+    {
+        return lights.size();
+    }
+    
     void AppendLight(Light& light)
     {
         lights.push_back(light);
     }
+    void AppendEmissionMesh(const Light& light);
 
 private:
     void createTLAS();

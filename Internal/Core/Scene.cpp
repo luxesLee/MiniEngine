@@ -29,6 +29,41 @@ void Scene::CleanScene()
     
 }
 
+void Scene::AppendEmissionMesh(const Light &light)
+{
+    Material material;
+    material.emission = light.color;
+    materials.push_back(material);
+
+    Mesh* mesh = new Mesh();
+    glm::vec3 normal = glm::normalize(glm::cross(light.u, light.v));
+    glm::vec3 position = glm::vec3(light.position.x, light.position.y, light.position.z);
+    
+
+    glm::vec3 v1 = position + glm::vec3(0.0, 0, 0.0);
+    glm::vec3 v2 = position + glm::vec3(-0.1, 0, 0);
+    glm::vec3 v3 = position + glm::vec3(0.0, 0, 0.1);
+    glm::vec3 v4 = position + glm::vec3(-0.1, 0, 0.1);
+    mesh->vertices.push_back(v1);
+    mesh->vertices.push_back(v2);
+    mesh->vertices.push_back(v4);
+    mesh->vertices.push_back(v1);
+    mesh->vertices.push_back(v4);
+    mesh->vertices.push_back(v3);
+    mesh->normals.push_back(normal);
+    mesh->normals.push_back(normal);
+    mesh->normals.push_back(normal);
+    mesh->normals.push_back(normal);
+    mesh->normals.push_back(normal);
+    mesh->normals.push_back(normal);
+    meshes.push_back(mesh);
+
+    MeshInstance meshInstance(meshes.size() - 1, 
+                                materials.size() - 1, 
+                                glm::mat4(1.0f));
+    meshInstances.push_back(meshInstance);
+}
+
 void Scene::createTLAS()
 {
     int n = meshInstances.size();
@@ -223,7 +258,7 @@ void Scene::UploadDataToGpu()
         TextureInfo lightTexInfo(TextureType::Buffer,
                                     lights.size() * sizeof(Light),
                                     lights.data(),
-                                    GL_R32F);
+                                    GL_RGBA32F);
         lightTex = RenderResHelper::generateGPUTexture(lightTexInfo);
 
         TextureInfo transformTexInfo(TextureType::Image2D, 

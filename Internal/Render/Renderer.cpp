@@ -131,10 +131,11 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
         glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
         int maxDepth = 1;
         int topBVHIndex = scene->getTopBVHIndex();
+        int lightNum = scene->getLightNum();
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(int), &g_Config->maxRayTracingDepth);
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(int), sizeof(int), &g_Config->accumulateFrames);
         glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(int), sizeof(int), &topBVHIndex);
-        glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(int), sizeof(int), &maxDepth);
+        glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(int), sizeof(int), &lightNum);
     }
 
     scene->curOutputTex = 1 - scene->curOutputTex;
