@@ -107,12 +107,104 @@ struct Material
     float padding2;
 };
 
+Material GetMatrixData(inout HitInfo hitInfo)
+{
+    int matIndex = 8 * hitInfo.matID;
+    vec2 uv = hitInfo.barycentricUV;
+
+    vec4 param1 = texelFetch(matTex, ivec2(matIndex + 0, 0), 0);
+    vec4 param2 = texelFetch(matTex, ivec2(matIndex + 1, 0), 0);
+    vec4 param3 = texelFetch(matTex, ivec2(matIndex + 2, 0), 0);
+    vec4 param4 = texelFetch(matTex, ivec2(matIndex + 3, 0), 0);
+    vec4 param5 = texelFetch(matTex, ivec2(matIndex + 4, 0), 0);
+    vec4 param6 = texelFetch(matTex, ivec2(matIndex + 5, 0), 0);
+    vec4 param7 = texelFetch(matTex, ivec2(matIndex + 6, 0), 0);
+    vec4 param8 = texelFetch(matTex, ivec2(matIndex + 7, 0), 0);
+
+    Material data;
+    data.baseColor          = param1.rgb;
+    data.anisotropic        = param1.w;
+
+    data.emission           = param2.rgb;
+
+    data.metallic           = param3.x;
+    data.roughness          = max(param3.y, 0.001);
+    data.subsurface         = param3.z;
+    data.specularTint       = param3.w;
+
+    data.sheen              = param4.x;
+    data.sheenTint          = param4.y;
+    data.clearcoat          = param4.z;
+    data.clearcoatRoughness = mix(0.1f, 0.001f, param4.w); // Remapping from gloss to roughness
+
+    data.specTrans          = param5.x;
+    data.ior                = param5.y;
+    data.medium.type        = int(param5.z);
+    data.medium.density     = param5.w;
+
+    data.medium.color       = param6.rgb;
+    data.medium.anisotropy  = clamp(param6.w, -0.9, 0.9);
+
+    ivec4 texIDs           = ivec4(param7);
+
+    data.opacity            = param8.x;
+    data.alphaMode          = int(param8.y);
+    data.alphaCutoff        = param8.z;
+
+    if(texIDs.x >= 0)
+    {
+        vec4 col = texture(textureMapsArrayTex, vec3(uv, texIDs.x));
+        data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
+        data.opacity *= col.a;
+    }
+
+    if(texIDs.y >= 0)
+    {
+        vec2 matRgh = texture(textureMapsArrayTex, vec3(uv, texIDs.y)).bg;
+        data.metallic = matRgh.x;
+        data.roughness = max(matRgh.y, 0.001);
+    }
+
+    // if(texIDs.z >= 0)
+    // {
+    //     vec3 texNormal = texture(textureMapsArrayTex, vec3(uv, texIDs.z)).rgb;
+    //     texNormal = normalize(texNormal * 2.0 - 1.0);
+    // }
+
+    if(texIDs.w >= 0)
+    {
+        data.emission = pow(texture(textureMapsArrayTex, vec3(uv, texIDs.w)).rgb, vec3(2.2));
+    }
+
+    return data;
+}
+
 struct Brdf
 {
     vec3 diffuseAlbedo;
     vec3 specularF0;
     float roughness;
 };
+
+float DielectricSpecularToF0(float specular)
+{
+    return 0.08f * specular;
+}
+
+// F0 = mix(vec3(), albedo(baseColor), metallic);
+vec3 ComputeF0(float specular, vec3 baseColor, float metalness)
+{
+    return mix(DielectricSpecularToF0(specular).xxx, baseColor, metalness);
+}
+
+Brdf GetBrdfData(Material material)
+{
+    Brdf data;
+    data.diffuseAlbedo = material.baseColor * (1 - material.metallic);
+    data.specularF0 = ComputeF0(material.specularTint, material.baseColor, material.metallic);
+    data.roughness = material.roughness;
+    return data;
+}
 
 #define DIRECTIONAL 0
 #define POINT 1
@@ -130,7 +222,7 @@ struct Light
     float innerCosine;
     vec3 u;
     vec3 v;
-    int padd;
+    float dis;
 };
 
 Light GetLightData(int index)
@@ -264,7 +356,7 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
 
                 // tuvw all components must be greater than 0
                 // and hit point need the closest one
-                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x < t && tuvw.x > ray.Tmin)
+                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x < t && tuvw.x > ray.Tmin && tuvw.x <= ray.TMax)
                 {
                     t = tuvw.x;
                     hitInfo.triIndice = indice;
@@ -363,10 +455,11 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
     vec3 n2 = texelFetch(normalTex, hitInfo.triIndice.z).xyz;
     vec3 localNormal = n0 * hitInfo.triUVW.x + n1 * hitInfo.triUVW.y + n2 * hitInfo.triUVW.z;
     hitInfo.worldNormal = normalize(transpose((mat3(hitInfo.object2WorldTransform))) * localNormal);
-    return true;
+
+    return dot(ray.direction, hitInfo.worldNormal) < 0;
 }
 
-// 为上面TraceRay的简化版本，测算会快20ms左右
+// 为上面TraceRay的简化版本
 bool TraceShadowRay(Ray ray)
 {
     int curMatIndex = 0;
@@ -415,7 +508,7 @@ bool TraceShadowRay(Ray ray)
                 tuvw.xyz = tuvw.xyz / det;
                 tuvw.w = 1.0f - tuvw.y - tuvw.z;
 
-                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x > ray.Tmin)
+                if(all(greaterThanEqual(tuvw, vec4(0.0))) && tuvw.x >= ray.Tmin && tuvw.x <= ray.TMax)
                 {
                     return true;
                 }
@@ -493,25 +586,43 @@ bool TraceShadowRay(Ray ray)
     return false;
 }
 
-float TraceShadow(vec3 worldPos, Light lightInfo)
+float TraceShadow(vec3 worldPos, inout Light lightInfo, vec2 randVec2)
 {
     Ray ray2Light;
     ray2Light.origin = worldPos;
+    ray2Light.Tmin = 0;
     bool bAnyHit = false;
     if(lightInfo.type == DIRECTIONAL)
     {
         ray2Light.direction = -lightInfo.direction.xyz;
+        ray2Light.TMax = FLT_MAX;
         bAnyHit = TraceShadowRay(ray2Light);
     }
     else if(lightInfo.type == POINT)
     {
-        ray2Light.direction = normalize(lightInfo.position.xyz - worldPos);
+        ray2Light.TMax = length(lightInfo.position.xyz - worldPos);
+        ray2Light.direction = (lightInfo.position.xyz - worldPos) / ray2Light.TMax;
+        bAnyHit = TraceShadowRay(ray2Light);
     }
     else if(lightInfo.type == SPOT)
     {
 
     }
+    else if(lightInfo.type == QUAD)
+    {
+        // 随机在矩形光源上采样一点作为光源
+        vec3 xAxis = lightInfo.u - lightInfo.position.xyz, yAxis = lightInfo.v - lightInfo.position.xyz;
+        vec3 lightNormal = cross(xAxis, yAxis);
+        vec3 lightPos = lightInfo.position.xyz + randVec2.x * xAxis + randVec2.y * yAxis;
 
+        ray2Light.TMax = length(lightPos - worldPos);
+        ray2Light.direction = (lightPos - worldPos) / ray2Light.TMax;
+
+        lightInfo.direction = vec4(-ray2Light.direction, 1.0f);
+        lightInfo.dis = ray2Light.TMax;
+
+        bAnyHit = dot(lightNormal, ray2Light.direction) >= 0 ? true : TraceShadowRay(ray2Light);
+    }
     return bAnyHit ? 0.0f : 1.0f;
 }
 
@@ -521,6 +632,11 @@ bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightInd
 {
     float totalWeights = 0.0f;
     float samplePDF = 0.0f;
+
+    if(lightNum == 1)
+    {
+        return true;
+    }
 
     int candidateMax = min(lightNum, RIS_CANDIDATES_LIGHTS);
     for(int i = 0; i < candidateMax; i++)
@@ -549,26 +665,6 @@ bool SampleLightRIS(inout uint rng, vec3 position, vec3 normal, out int lightInd
 
     sampleWeight = (totalWeights / candidateMax) / samplePDF;
     return true;
-}
-
-float DielectricSpecularToF0(float specular)
-{
-    return 0.08f * specular;
-}
-
-// F0 = mix(vec3(), albedo(baseColor), metallic);
-vec3 ComputeF0(float specular, vec3 baseColor, float metalness)
-{
-    return mix(DielectricSpecularToF0(specular).xxx, baseColor, metalness);
-}
-
-Brdf GetBrdfData(Material material)
-{
-    Brdf data;
-    data.diffuseAlbedo = material.baseColor * (1 - material.metallic);
-    data.specularF0 = ComputeF0(material.specularTint, material.baseColor, material.metallic);
-    data.roughness = material.roughness;
-    return data;
 }
 
 // 法线分布项
@@ -625,78 +721,6 @@ vec3 DefaultBRDF(vec3 L, vec3 V, vec3 N, vec3 diffuse, vec3 specular, float roug
     vec3 diffuseBrdf = diffuse * INVPI * (1.0 - F); 
 
     return diffuseBrdf + specularBrdf;
-}
-
-Material GetMatrixData(inout HitInfo hitInfo)
-{
-    int matIndex = 8 * hitInfo.matID;
-    vec2 uv = hitInfo.barycentricUV;
-
-    vec4 param1 = texelFetch(matTex, ivec2(matIndex + 0, 0), 0);
-    vec4 param2 = texelFetch(matTex, ivec2(matIndex + 1, 0), 0);
-    vec4 param3 = texelFetch(matTex, ivec2(matIndex + 2, 0), 0);
-    vec4 param4 = texelFetch(matTex, ivec2(matIndex + 3, 0), 0);
-    vec4 param5 = texelFetch(matTex, ivec2(matIndex + 4, 0), 0);
-    vec4 param6 = texelFetch(matTex, ivec2(matIndex + 5, 0), 0);
-    vec4 param7 = texelFetch(matTex, ivec2(matIndex + 6, 0), 0);
-    vec4 param8 = texelFetch(matTex, ivec2(matIndex + 7, 0), 0);
-
-    Material data;
-    data.baseColor          = param1.rgb;
-    data.anisotropic        = param1.w;
-
-    data.emission           = param2.rgb;
-
-    data.metallic           = param3.x;
-    data.roughness          = max(param3.y, 0.001);
-    data.subsurface         = param3.z;
-    data.specularTint       = param3.w;
-
-    data.sheen              = param4.x;
-    data.sheenTint          = param4.y;
-    data.clearcoat          = param4.z;
-    data.clearcoatRoughness = mix(0.1f, 0.001f, param4.w); // Remapping from gloss to roughness
-
-    data.specTrans          = param5.x;
-    data.ior                = param5.y;
-    data.medium.type        = int(param5.z);
-    data.medium.density     = param5.w;
-
-    data.medium.color       = param6.rgb;
-    data.medium.anisotropy  = clamp(param6.w, -0.9, 0.9);
-
-    ivec4 texIDs           = ivec4(param7);
-
-    data.opacity            = param8.x;
-    data.alphaMode          = int(param8.y);
-    data.alphaCutoff        = param8.z;
-
-    if(texIDs.x >= 0)
-    {
-        vec4 col = texture(textureMapsArrayTex, vec3(uv, texIDs.x));
-        data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
-        data.opacity *= col.a;
-    }
-
-    if(texIDs.y >= 0)
-    {
-        vec2 matRgh = texture(textureMapsArrayTex, vec3(uv, texIDs.y)).bg;
-        data.metallic = matRgh.x;
-        data.roughness = max(matRgh.y, 0.001);
-    }
-
-    // if(texIDs.z >= 0)
-    // {
-    //     vec3 texNormal = texture(textureMapsArrayTex, vec3(uv, texIDs.z)).rgb;
-    //     texNormal = normalize(texNormal * 2.0 - 1.0);
-    // }
-
-    if(texIDs.w >= 0)
-    {
-        data.emission = pow(texture(textureMapsArrayTex, vec3(uv, texIDs.w)).rgb, vec3(2.2));
-    }
-
-    return data;
 }
 
 float luminance(vec3 color) 
@@ -816,35 +840,42 @@ void main()
             Brdf brdf = GetBrdfData(mat);
             vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
 
-            vec3 directLighting = vec3(0);
-            int lightIndex = 0;
-            float lightWeight = 1.0f;
-            // 避免对每个光源都进行追踪，因而选择最重要的一个，方法为重要性重采样RIS
-            if(SampleLightRIS(rng, hitInfo.worldPosition, hitInfo.worldNormal, lightIndex, lightWeight))
+            if(length(mat.emission) != 0) // 命中光源，不递归计算
             {
-                Light lightInfo = GetLightData(lightIndex);
-                // 可见性，路径追踪中为0或1
-                float visibility = TraceShadow(hitInfo.worldPosition, lightInfo);
-                vec3 wi = normalize(-lightInfo.direction.xyz);
-                float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
-                // 直接光
-                directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * NdotL;
+                radiance += (mat.emission) * throughput / pdf;
+                break;
             }
-            // 计算对原着色点的贡献
-            radiance += lightWeight * (directLighting + mat.emission) * throughput / pdf;
+            else // 直接光
+            {
+                int lightIndex = 0;
+                float lightWeight = 1.0f;
+                // 避免对每个光源都进行追踪，因而选择最重要的一个，方法为重要性重采样RIS
+                if(SampleLightRIS(rng, hitInfo.worldPosition, hitInfo.worldNormal, lightIndex, lightWeight))
+                {
+                    Light lightInfo = GetLightData(lightIndex);
+                    // 可见性，路径追踪中为0或1
+                    float visibility = TraceShadow(hitInfo.worldPosition, lightInfo, vec2(RNG_next(rng), RNG_next(rng)));
+                    vec3 wi = normalize(-lightInfo.direction.xyz);
+                    float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
+                    float attenuation = lightInfo.type == DIRECTIONAL ? 1.0f : (1.0f / (1 + lightInfo.dis * lightInfo.dis));
+                    vec3 directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * attenuation * NdotL;
+                    // 计算直接光对原着色点的贡献
+                    radiance += lightWeight * (directLighting) * throughput / pdf;
+                }
+            }
 
             // 调试输出
             // if(i == maxDepth - 1)
-            // if(i == 0)
+            // if(i == 2)
             // {
-            //     color = vec4(lightWeight, 0, 0, 1.0);
+            //     // color = vec4(mat.emission, 1.0);
             //     // accum = vec4(hitInfo.t, 0, 0, 1.0f);
-            //     return;
+            //     radiance = mat.emission;
+            //     break;
             // }
 
-            // 自发光物体视为光源
             // 无须计算当前命中点生成的光线
-            if(i == maxDepth - 1 || length(mat.emission) != 0)
+            if(i == maxDepth - 1)
             {
                 break;
             }
@@ -901,18 +932,19 @@ void main()
         }
     }
 
-    vec3 accumColor = texelFetch(accumTex, ivec2(gl_FragCoord.xy), 0).rgb;
-    vec3 outputColor = radiance;
-    if(accumulateFrames > 1)
-    {
-        outputColor = mix(outputColor, accumColor / accumulateFrames, 0.95);
-    }
-    
     if (any(isnan(radiance)) || any(isinf(radiance)))
     {
         radiance = vec3(1.0f, 0, 0);
     }
 
-    color = vec4(outputColor, 1.0f);
+    vec3 accumColor = texelFetch(accumTex, ivec2(gl_FragCoord.xy), 0).rgb;
+    vec3 outputColor = radiance;
+    // if(accumulateFrames > 1)
+    // {
+    //     outputColor = mix(outputColor, accumColor / accumulateFrames, 0.99);
+    // }
+    // color = vec4(outputColor, 1.0f);
+
+    color = vec4((outputColor + accumColor) / accumulateFrames, 1.0f);
     accum = vec4(radiance + accumColor, 1.0f);
 }

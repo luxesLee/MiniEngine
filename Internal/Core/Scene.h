@@ -71,7 +71,7 @@ public:
     {
         lights.push_back(light);
     }
-    void AppendEmissionMesh(const Light& light);
+    void AppendLightMesh(const Light& light);
 
 private:
     void createTLAS();

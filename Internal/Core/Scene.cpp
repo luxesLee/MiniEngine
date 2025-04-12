@@ -29,33 +29,48 @@ void Scene::CleanScene()
     
 }
 
-void Scene::AppendEmissionMesh(const Light &light)
+void Scene::AppendLightMesh(const Light &light)
 {
+    if(light.type == DIRECTIONAL_LIGHT)
+    {
+        return;
+    }
+
     Material material;
     material.emission = light.color;
     materials.push_back(material);
 
+    auto AppendMesh = [&](Mesh* meshes, std::vector<glm::vec3>& vertArray, std::vector<glm::vec3>& normalArray)
+    {
+        meshes->vertices.insert(meshes->vertices.end(), vertArray.begin(), vertArray.end());
+        meshes->normals.insert(meshes->normals.end(), normalArray.begin(), normalArray.end());
+    };
     Mesh* mesh = new Mesh();
-    glm::vec3 normal = glm::normalize(glm::cross(light.u, light.v));
-    glm::vec3 position = glm::vec3(light.position.x, light.position.y, light.position.z);
-    
+    if(light.type == POINT_LIGHT)
+    {
+        glm::vec3 position = light.position;
 
-    glm::vec3 v1 = position + glm::vec3(0.0, 0, 0.0);
-    glm::vec3 v2 = position + glm::vec3(-0.1, 0, 0);
-    glm::vec3 v3 = position + glm::vec3(0.0, 0, 0.1);
-    glm::vec3 v4 = position + glm::vec3(-0.1, 0, 0.1);
-    mesh->vertices.push_back(v1);
-    mesh->vertices.push_back(v2);
-    mesh->vertices.push_back(v4);
-    mesh->vertices.push_back(v1);
-    mesh->vertices.push_back(v4);
-    mesh->vertices.push_back(v3);
-    mesh->normals.push_back(normal);
-    mesh->normals.push_back(normal);
-    mesh->normals.push_back(normal);
-    mesh->normals.push_back(normal);
-    mesh->normals.push_back(normal);
-    mesh->normals.push_back(normal);
+
+
+    }
+    else if(light.type == SPOT_LIGHT)
+    {
+
+    }
+    else if(light.type == QUAD_LIGHT)
+    {
+        glm::vec3 position = light.position;
+        glm::vec3 xAxis = light.u - position, yAxis = light.v - position;
+        glm::vec3 normal = glm::normalize(glm::cross(xAxis, yAxis));
+        glm::vec3 v1 = position;
+        glm::vec3 v2 = position + xAxis;
+        glm::vec3 v3 = position + yAxis;
+        glm::vec3 v4 = position + xAxis + yAxis;
+
+        AppendMesh(mesh, 
+                std::vector<glm::vec3>{v1, v2, v4, v1, v4, v3}, 
+                std::vector<glm::vec3>{normal, normal, normal, normal, normal, normal});
+    }
     meshes.push_back(mesh);
 
     MeshInstance meshInstance(meshes.size() - 1, 
