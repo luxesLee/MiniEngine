@@ -6,7 +6,8 @@ void ShaderManager::InitShader()
     shaderMap["TestShader"] = new Shader("Shaders/TestShader.vert", "Shaders/TestShader.frag");
     shaderMap["PathTracing"] = new Shader("Shaders/PostProcess.vert", "Shaders/PathTracing.frag");
     shaderMap["ToneMapping"] = new Shader("Shaders/PostProcess.vert", "Shaders/ToneMapping.frag");
-    
+    shaderMap["BasePass"] = new Shader("Shaders/BasePass.vert", "Shaders/BasePass.frag");
+    shaderMap["PreDepthPass"] = new Shader("Shaders/BasePass.vert", "Shaders/Empty.frag");
 }
 
 Shader* ShaderManager::GetShader(const std::string &shaderKey)

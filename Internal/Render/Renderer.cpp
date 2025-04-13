@@ -20,7 +20,7 @@ Renderer::Renderer()
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
-    glBufferData(GL_UNIFORM_BUFFER, 5 * sizeof(glm::mat4) + 2 * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + 2 * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
     glGenBuffers(1, &PathTracingUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 1, PathTracingUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
@@ -58,18 +58,22 @@ void Renderer::Render(Scene *scene)
     //     glClear(GL_COLOR_BUFFER_BIT);
     // }
 
+    scene->curOutputTex = 1 - scene->curOutputTex;
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[scene->curOutputTex], 0);
+
     FrameGraph fg;
     FrameGraphBlackboard blackboard;
     // todo: forward and deferred
     switch (g_Config->lightMode)
     {
     case LightMode::Forward:
-        ForwardRendering();
+        ForwardRendering(fg, blackboard, scene);
         break;
     case LightMode::Deferred:
     case LightMode::TiledDeferred:
     case LightMode::ClusterDeferred:
-        DeferredRendering();
+        DeferredRendering(fg, blackboard, scene);
         break;
     case LightMode::PathTracing:
         PathTracing(fg, blackboard, scene);
@@ -80,6 +84,11 @@ void Renderer::Render(Scene *scene)
     // fg.compile();
     // fg.execute();
 
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 
     if(g_Config->bRenderdocCapture)
@@ -99,14 +108,25 @@ void Renderer::UpdateUBO()
     if(CommonUBO)
     {
         glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), &g_Camera->GetViewMatrix());
+        // Model
+        glm::mat4 indentity = glm::mat4(1.0f);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), &indentity);
+        // View
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), &g_Camera->GetViewMatrix());
+        // Projection
         glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4), &g_Camera->GetProjectionMatrix());
-        glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4), &glm::inverse(g_Camera->GetProjectionMatrix()));
-        glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), sizeof(glm::mat4), &glm::inverse(g_Camera->GetProjectionMatrix() * g_Camera->GetViewMatrix()));
-        glBufferSubData(GL_UNIFORM_BUFFER, 5 * sizeof(glm::mat4), sizeof(glm::vec4), &g_Camera->GetScreenAndInvScreen());
-        glBufferSubData(GL_UNIFORM_BUFFER, 5 * sizeof(glm::mat4) + sizeof(glm::vec4), sizeof(glm::vec4), &g_Camera->Position);
+        // ProjectionView
+        glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::mat4), sizeof(glm::mat4), &(g_Camera->GetProjectionMatrix() * g_Camera->GetViewMatrix()));
+        // invProjection
+        glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof(glm::mat4), sizeof(glm::mat4), &glm::inverse(g_Camera->GetProjectionMatrix()));
+        // invViewProjection
+        glBufferSubData(GL_UNIFORM_BUFFER, 5 * sizeof(glm::mat4), sizeof(glm::mat4), &glm::inverse(g_Camera->GetProjectionMatrix() * g_Camera->GetViewMatrix()));
+        // screenAndInvScreen
+        glBufferSubData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4), sizeof(glm::vec4), &g_Camera->GetScreenAndInvScreen());
+        // cameraPosition
+        glBufferSubData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + sizeof(glm::vec4), sizeof(glm::vec4), &g_Camera->Position);
     }
+
 
 }
 
@@ -114,13 +134,18 @@ void Renderer::DoCulling()
 {
 }
 
-void Renderer::ForwardRendering()
+void Renderer::ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
     
 }
 
-void Renderer::DeferredRendering()
+void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
+    basePass.AddPass(fg, blackboard, scene);
+
+
+
+    
 }
 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
@@ -138,11 +163,6 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
         glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(int), sizeof(int), &lightNum);
     }
 
-    scene->curOutputTex = 1 - scene->curOutputTex;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[scene->curOutputTex], 0);
-
     pathTracingPass.AddPass(fg, blackboard, scene);
     if(g_Config->curToneMapping > 0)
     {
@@ -153,10 +173,4 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
     {
         denoisePass->AddPass(scene);
     }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <memory>
 #include <vec2.hpp>
 #include <mat4x4.hpp>
 #include <glad/glad.h>
@@ -16,8 +17,9 @@ class Renderer;
 
 struct Indice
 {
-    Indice(int _x, int _y, int _z) : x(_x), y(_y), z(_z) {}
-    int x, y, z;
+    Indice() {}
+    Indice(Uint32 _x, Uint32 _y, Uint32 _z) : x(_x), y(_y), z(_z) {}
+    Uint32 x, y, z;
 };
 
 class Scene
@@ -27,87 +29,16 @@ class Scene
 public:
     Scene() 
     {
-        sceneBvh = new Bvh(10.0f, 64, true);
+        sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
         curOutputTex = 1;
     }
     ~Scene()
     {
-        for(int i = 0; i < meshes.size(); i++)
-        {
-            if(meshes[i])
-            {
-                delete meshes[i];
-                meshes[i] = nullptr;
-            }
-        }
-
-        for(int i = 0; i < textures.size(); i++)
-        {
-            if(textures[i])
-            {
-                delete textures[i];
-                textures[i] = nullptr;
-            }
-        }
-        if(envMap)
-        {
-            delete envMap;
-        }
+        CleanScene();
     }
 
     void BuildScene();
     void CleanScene();
-
-    int getTopBVHIndex() const 
-    {
-        return bvhTranslator.topLevelIndex;
-    }
-    int getLightNum() const 
-    {
-        return lights.size();
-    }
-    
-    void AppendLight(Light& light)
-    {
-        lights.push_back(light);
-    }
-    void AppendLightMesh(const Light& light);
-
-private:
-    void createTLAS();
-    void createBLAS();
-    void prepareMeshData();
-    void prepareTransform();
-    void prepareTexture();
-
-    Bvh* sceneBvh;
-    BvhTranslator bvhTranslator;
-
-    std::vector<vec3> vertices;
-    std::vector<Indice> indices;
-    std::vector<vec3> normals;
-    std::vector<vec2> uvs;
-    std::vector<Material> materials;
-    std::vector<Light> lights;
-
-    std::vector<Mesh*> meshes;
-    std::vector<MeshInstance> meshInstances;
-    std::vector<mat4> transforms;
-    std::vector<Texture*> textures;
-    std::vector<unsigned char> textureMapsArray;
-    Texture* envMap;
-
-public:
-    GLuint getVertTexId() const {return verticeTex.texId;}
-    GLuint getIndiceTexId() const {return indicesTex.texId;}
-    GLuint getNormalTexId() const {return normalTex.texId;}
-    GLuint getUVTexId() const {return uvsTex.texId;}
-    GLuint getBVHTexId() const {return bvhTex.texId;}
-    GLuint getMatTexId() const {return matTex.texId;}
-    GLuint getLightTexId() const {return lightTex.texId;}
-    GLuint getEnvTexId() const {return envTex.texId;}
-    GLuint getTransformTexId() const {return instanceTransformTex.texId;}
-    GLuint getTextureArrayId() const {return textureArrayTex.texId;}
 
     void InitFBO();
     void DeleteFBO();
@@ -123,8 +54,76 @@ public:
     GLuint toneMappingFBO;
     GLuint toneMappingTexId;
 
+    GLuint deferredBasePassFBO;
+    GLuint GBufferTexId0, GBufferTexId1, GBufferTexId2, GBufferTexId3;
+    GLuint basePassDepthStencilTexId;
+
 private:
     void UploadDataToGpu();
+    void DeleteGPUData();
+
+public:
+    int getTopBVHIndex() const 
+    {
+        return bvhTranslator.topLevelIndex;
+    }
+    int getLightNum() const 
+    {
+        return lights.size();
+    }
+    
+    void AppendLight(Light& light)
+    {
+        lights.push_back(light);
+    }
+    void AppendLightMesh(const Light& light);
+
+public:
+    const std::vector<MeshBatch*>& GetMeshBatches() const
+    {
+        return meshBatches;
+    }
+
+private:
+    std::vector<Mesh*> meshes;
+    std::vector<MeshInstance> meshInstances;
+
+    void CombineMesh();
+    std::vector<MeshBatch*> meshBatches;
+
+private:
+    void createTLAS();
+    void createBLAS();
+    void prepareMeshData();
+    void prepareTransform();
+    void prepareTexture();
+
+    std::shared_ptr<Bvh> sceneBvh;
+    BvhTranslator bvhTranslator;
+
+    std::vector<vec3> vertices;
+    std::vector<Indice> indices;
+    std::vector<vec3> normals;
+    std::vector<vec2> uvs;
+    std::vector<Material> materials;
+    std::vector<Light> lights;
+
+    std::vector<mat4> transforms;
+    std::vector<Texture*> textures;
+    std::vector<Uchar> textureMapsArray;
+    std::shared_ptr<Texture> envMap;
+
+public:
+    GLuint getVertTexId() const {return verticeTex.texId;}
+    GLuint getIndiceTexId() const {return indicesTex.texId;}
+    GLuint getNormalTexId() const {return normalTex.texId;}
+    GLuint getUVTexId() const {return uvsTex.texId;}
+    GLuint getBVHTexId() const {return bvhTex.texId;}
+    GLuint getMatTexId() const {return matTex.texId;}
+    GLuint getLightTexId() const {return lightTex.texId;}
+    GLuint getEnvTexId() const {return envTex.texId;}
+    GLuint getTransformTexId() const {return instanceTransformTex.texId;}
+    GLuint getTextureArrayId() const {return textureArrayTex.texId;}
 
 private:
     GPUTexture verticeTex;

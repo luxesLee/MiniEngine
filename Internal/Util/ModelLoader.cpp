@@ -1,17 +1,18 @@
-#include "ModelLoader.h"
-#include "Core/Scene.h"
-#include "Core/Mesh.h"
-#include "Core/Texture.h"
-#include "Core/Image.h"
-#define TINYOBJLOADER_IMPLEMENTATION 
-#include <tiny_obj_loader.h>
 #include <string>
 #include <iostream>
 #include <map>
 #include <functional>
 #include <utility>
-#include <gtc/matrix_transform.hpp>
-#include <gtc/type_ptr.hpp>
+#define TINYOBJLOADER_IMPLEMENTATION 
+#include "tiny_obj_loader.h"
+#include "gtc/matrix_transform.hpp"
+#include "gtc/type_ptr.hpp"
+#include "ModelLoader.h"
+#include "Core/Scene.h"
+#include "Core/Mesh.h"
+#include "Core/Texture.h"
+#include "Core/Image.h"
+
 
 void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
 {
@@ -19,12 +20,6 @@ void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
     // if(image.isInit())
     {
         // Texture* envMapTex = new Texture(image.Width(), image.Height());
-
-        if(scene->envMap)
-        {
-            delete scene->envMap;
-            scene->envMap = nullptr;
-        }
         // scene->envMap = envMapTex;
     }
 }
@@ -235,6 +230,7 @@ void ModelLoader::loadMeshFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel
                 mesh->normals.push_back(normals[indices[v]]);
                 mesh->uvs.push_back(uvs[indices[v]]);
             }
+            mesh->indices.insert(mesh->indices.end(), indices.begin(), indices.end());
 
             scene->meshes.push_back(mesh);
             meshMap[meshId].push_back(std::make_pair<int, int>(scene->meshes.size() - 1, scene->materials.size() + prim.material));
@@ -364,13 +360,16 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
                                             attrib.normals[2 * idx.texcoord_index + 1]});
                 }
             }
+            mesh->indices.push_back(indexOffset);
+            mesh->indices.push_back(indexOffset + 1);
+            mesh->indices.push_back(indexOffset + 2);
             indexOffset += 3;
         }
         scene->meshes.push_back(mesh);
         MeshInstance meshInstance(scene->meshes.size() - 1, 
                                 scene->materials.size() - 1 + (bMatAlreadyLoad ? 0 : objMesh.material_ids[0]), 
                                 modelConfig.transform);
-                                // glm::mat4(1.0f));
+
         scene->meshInstances.push_back(meshInstance);
     }
 

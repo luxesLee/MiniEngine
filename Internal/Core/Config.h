@@ -1,7 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include <glm.hpp>
+#include "glm.hpp"
+#include "Util/Types.h"
 
 enum LightMode
 {
@@ -38,34 +39,34 @@ public:
     }
 
     // screen
-    uint32_t wholeWidth = 1630;
-    const uint32_t imguiWidth = 350;
-    uint32_t screenWidth = 1280;
-    uint32_t screenHeight = 960;
+    Uint32 wholeWidth = 1630;
+    const Uint32 imguiWidth = 350;
+    Uint32 screenWidth = 1280;
+    Uint32 screenHeight = 960;
     std::string title = "MiniEngine";
 
     // sceneConfigPath
-    std::string configPath = "../../Resource/Cornell_box.json";
+    std::string configPath = "../../Resource/Cornell_box_Quad_Light.json";
 
     // camera
-    float cameraMoveSpeed = 7.0f;
-    float cameraRotSensitivity = 0.1f;
-    float cameraZNear = 800.0f;
-    float cameraZFar = 1.0f;
+    Float cameraMoveSpeed = 7.0f;
+    Float cameraRotSensitivity = 0.1f;
+    Float cameraZNear = 800.0f;
+    Float cameraZFar = 1.0f;
 
     // render
-    LightMode lightMode = LightMode::PathTracing;
-    int maxRayTracingDepth = 2;
-    uint32_t accumulateFrames = 0;
+    LightMode lightMode = LightMode::Deferred;
+    Int32 maxRayTracingDepth = 2;
+    Uint32 accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;
     ToneMappingType curToneMapping = ToneMappingType::Linear;
-    uint32_t texWidth = 512, texHeight = 512;
+    Uint32 texWidth = 512, texHeight = 512;
+    Bool bPreDepthPass = false;
 
     // action
-    bool bRenderdocCapture = false;
-    bool bShadeBaseColor = false;
-
-    bool bMouseMove = false;
+    Bool bRenderdocCapture = false;
+    Bool bShadeBaseColor = false;
+    Bool bMouseMove = false;
 
 private:
     Config() {}

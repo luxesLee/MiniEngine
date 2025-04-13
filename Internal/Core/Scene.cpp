@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "Scene.h"
 #include "Camera.h"
 #include "Config.h"
@@ -9,24 +10,64 @@ void Scene::BuildScene()
 {
     if(g_Config->lightMode == LightMode::PathTracing)
     {
-        // Bottom Level Acceleration Structure -- for mesh
-        createBLAS();
-        // Top Level Acceleration Structure -- for meshInstance
-        createTLAS();
-        bvhTranslator.Process(sceneBvh, meshes, meshInstances);
-
+        createBLAS();   // Bottom Level Acceleration Structure -- for mesh
+        createTLAS();   // Top Level Acceleration Structure -- for meshInstance
+        bvhTranslator.Process(sceneBvh.get(), meshes, meshInstances);
         prepareMeshData();
         prepareTransform();
         prepareTexture();
     }
-
+    else
+    {
+        CombineMesh();
+    }
 
     UploadDataToGpu();
 }
 
 void Scene::CleanScene()
 {
+    DeleteFBO();
+    DeleteGPUData();
     
+    vertices.resize(0);
+    indices.resize(0);
+    normals.resize(0);
+    uvs.resize(0);
+    materials.resize(0);
+    lights.resize(0);
+    for(int i = 0; i < meshes.size(); i++)
+    {
+        if(meshes[i])
+        {
+            delete meshes[i];
+            meshes[i] = nullptr;
+        }
+    }
+    meshes.resize(0);
+    meshInstances.resize(0);
+    transforms.resize(0);
+    for(int i = 0; i < textures.size(); i++)
+    {
+        if(textures[i])
+        {
+            delete textures[i];
+            textures[i] = nullptr;
+        }
+    }
+    textureMapsArray.resize(0);
+    envMap.reset();
+    sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
+
+    for(int i = 0; i < meshBatches.size(); i++)
+    {
+        if(meshBatches[i])
+        {
+            delete meshBatches[i];
+            meshBatches[i] = nullptr;
+        }
+    }
+    meshBatches.resize(0);
 }
 
 void Scene::AppendLightMesh(const Light &light)
@@ -49,9 +90,11 @@ void Scene::AppendLightMesh(const Light &light)
     if(light.type == POINT_LIGHT)
     {
         glm::vec3 position = light.position;
+        glm::vec3 normal = glm::vec3(1, 1, 1);
 
-
-
+        AppendMesh(mesh, 
+            std::vector<glm::vec3>{position, position, position}, 
+            std::vector<glm::vec3>{normal, normal, normal, normal, normal, normal});
     }
     else if(light.type == SPOT_LIGHT)
     {
@@ -77,6 +120,50 @@ void Scene::AppendLightMesh(const Light &light)
                                 materials.size() - 1, 
                                 glm::mat4(1.0f));
     meshInstances.push_back(meshInstance);
+}
+
+void Scene::CombineMesh()
+{
+    std::sort(meshInstances.begin(), meshInstances.end(), [&](MeshInstance& instance1, MeshInstance& instance2)
+    {
+        return instance1.meshID != instance2.meshID ? instance1.meshID < instance2.meshID : instance1.materialID < instance2.materialID;
+    });
+
+    auto CopyData = [&](MeshBatch* meshBatch, auto& meshes, auto& meshInstances, auto& transforms, int index)
+    {
+        meshBatch->instanceCount++;
+        meshBatch->vertices.insert(meshBatch->vertices.end(), 
+            meshes[meshInstances[index].meshID]->vertices.begin(), 
+            meshes[meshInstances[index].meshID]->vertices.end());
+        meshBatch->indices.insert(meshBatch->indices.end(), 
+            meshes[meshInstances[index].meshID]->indices.begin(), 
+            meshes[meshInstances[index].meshID]->indices.end());
+        meshBatch->normals.insert(meshBatch->normals.end(), 
+            meshes[meshInstances[index].meshID]->normals.begin(), 
+            meshes[meshInstances[index].meshID]->normals.end());
+        meshBatch->uvs.insert(meshBatch->uvs.end(), 
+            meshes[meshInstances[index].meshID]->uvs.begin(), 
+            meshes[meshInstances[index].meshID]->uvs.end());
+        for(int i = 0; i < meshes[meshInstances[index].meshID]->vertices.size(); i++)
+        {
+            meshBatch->materialIDs.push_back(meshInstances[index].materialID);
+        }
+        transforms.push_back(meshInstances[index].transform);
+    };
+
+    MeshBatch* meshBatch = new MeshBatch;
+    Int pre = 0;
+    CopyData(meshBatch, meshes, meshInstances, transforms, pre);
+    for(Int i = 1; i < meshInstances.size(); i++)
+    {
+        if(meshInstances[i].meshID != meshInstances[pre].meshID)
+        {
+            meshBatches.push_back(meshBatch);
+            meshBatch = new MeshBatch;
+        }
+       CopyData(meshBatch, meshes, meshInstances, transforms, i);
+    }
+    meshBatches.push_back(meshBatch);
 }
 
 void Scene::createTLAS()
@@ -178,44 +265,98 @@ void Scene::InitFBO()
 
 // ----------------------------------------------------------------------------
 
-    glGenFramebuffers(1, &pathTracingFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
+    if(g_Config->lightMode == LightMode::PathTracing)
+    {
+        glGenFramebuffers(1, &pathTracingFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
 
-    glGenTextures(1, &pathTracingTexId);
-    glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+        glGenTextures(1, &pathTracingTexId);
+        glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
-    glGenTextures(1, &accumTexId);
-    glBindTexture(GL_TEXTURE_2D, accumTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+        glGenTextures(1, &accumTexId);
+        glBindTexture(GL_TEXTURE_2D, accumTexId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
 
-    GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, DrawBuffers);
+        GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, DrawBuffers);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    else if(g_Config->lightMode == LightMode::Deferred)
+    {
+        glGenFramebuffers(1, &deferredBasePassFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, deferredBasePassFBO);
+
+        glGenTextures(1, &GBufferTexId0);
+        glBindTexture(GL_TEXTURE_2D, GBufferTexId0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GBufferTexId0, 0);
+
+        glGenTextures(1, &GBufferTexId1);
+        glBindTexture(GL_TEXTURE_2D, GBufferTexId1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, GBufferTexId1, 0);
+
+        glGenTextures(1, &GBufferTexId2);
+        glBindTexture(GL_TEXTURE_2D, GBufferTexId2);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, GBufferTexId2, 0);
+
+        glGenTextures(1, &GBufferTexId3);
+        glBindTexture(GL_TEXTURE_2D, GBufferTexId3);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, GBufferTexId3, 0);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        GLenum DrawBuffers[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+        glDrawBuffers(4, DrawBuffers);
+
+        glGenTextures(1, &basePassDepthStencilTexId);
+        glBindTexture(GL_TEXTURE_2D, basePassDepthStencilTexId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, basePassDepthStencilTexId, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
 // ----------------------------------------------------------------------------
 
-    glGenFramebuffers(1, &toneMappingFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, toneMappingFBO);
+    if(g_Config->curToneMapping != ToneMappingType::None)
+    {
+        glGenFramebuffers(1, &toneMappingFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, toneMappingFBO);
 
-    glGenTextures(1, &toneMappingTexId);
-    glBindTexture(GL_TEXTURE_2D, toneMappingTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, toneMappingTexId, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glGenTextures(1, &toneMappingTexId);
+        glBindTexture(GL_TEXTURE_2D, toneMappingTexId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, toneMappingTexId, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
 }
 
 void Scene::DeleteFBO()
@@ -303,6 +444,44 @@ void Scene::UploadDataToGpu()
     }
     else
     {
-        
+        TextureInfo matTexInfo(TextureType::Image2D, 
+                                GL_RGBA32F, 
+                                materials.size() * sizeof(Material) / sizeof(vec4), 
+                                1, 
+                                GL_RGBA, 
+                                GL_FLOAT, 
+                                materials.data());
+        matTex = RenderResHelper::generateGPUTexture(matTexInfo);
+
+        TextureInfo transformTexInfo(TextureType::Image2D, 
+                                    GL_RGBA32F, 
+                                    transforms.size() * sizeof(mat4) / sizeof(vec4), 
+                                    1, 
+                                    GL_RGBA, 
+                                    GL_FLOAT, 
+                                    transforms.data());
+        instanceTransformTex = RenderResHelper::generateGPUTexture(transformTexInfo);
+
+        for(auto& meshBatch : meshBatches)
+        {
+            meshBatch->Build();
+        }
+    }
+}
+
+void Scene::DeleteGPUData()
+{
+    if(g_Config->lightMode == LightMode::PathTracing)
+    {
+        RenderResHelper::destroyGPUTexture(verticeTex);
+        RenderResHelper::destroyGPUTexture(indicesTex);
+        RenderResHelper::destroyGPUTexture(normalTex);
+        RenderResHelper::destroyGPUTexture(uvsTex);
+        RenderResHelper::destroyGPUTexture(lightTex);
+        RenderResHelper::destroyGPUTexture(matTex);
+        RenderResHelper::destroyGPUTexture(instanceTransformTex);
+        RenderResHelper::destroyGPUTexture(bvhTex);
+        RenderResHelper::destroyGPUTexture(envTex);
+        RenderResHelper::destroyGPUTexture(textureArrayTex);
     }
 }

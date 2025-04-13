@@ -1,11 +1,11 @@
+#include "fg/FrameGraph.hpp"
+#include "fg/Blackboard.hpp"
 #include "PathTracingPass.h"
 #include "Render/ShaderManager.h"
+#include "Render/RenderResHelper.h"
 #include "Core/Scene.h"
 #include "Core/Shader.h"
-#include "Render/RenderResHelper.h"
-#include "core/Camera.h"
-#include <fg/FrameGraph.hpp>
-#include <fg/Blackboard.hpp>
+#include "Core/Config.h"
 
 
 GLuint vao;

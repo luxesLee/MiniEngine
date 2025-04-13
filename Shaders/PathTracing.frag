@@ -20,6 +20,7 @@ layout(binding = 0) uniform CommonUBO
     mat4 model;
     mat4 view;
     mat4 projection;
+    mat4 projectionView;
     mat4 invProjection;
     mat4 invViewProjection;
     vec4 screenAndInvScreen;
@@ -602,6 +603,10 @@ float TraceShadow(vec3 worldPos, inout Light lightInfo, vec2 randVec2)
     {
         ray2Light.TMax = length(lightInfo.position.xyz - worldPos);
         ray2Light.direction = (lightInfo.position.xyz - worldPos) / ray2Light.TMax;
+
+        lightInfo.direction = vec4(-ray2Light.direction, 1.0f);
+        lightInfo.dis = ray2Light.TMax;
+
         bAnyHit = TraceShadowRay(ray2Light);
     }
     else if(lightInfo.type == SPOT)

@@ -1,4 +1,5 @@
 #pragma once
+#include "Pass/BasePass.h"
 #include "Pass/PathTracingPass.h"
 #include "Pass/ToneMappingPass.h"
 #include "Pass/IDenoisePass.h"
@@ -28,12 +29,14 @@ public:
 private:
     void UpdateUBO();
     void DoCulling();
-    void ForwardRendering();
-    void DeferredRendering();
+    void ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
     void PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 
 
 private:
+    BasePass        basePass;
+
     PathTracingPass pathTracingPass;
     ToneMappingPass toneMappingPass;
     IDenoisePass* denoisePass = nullptr;
