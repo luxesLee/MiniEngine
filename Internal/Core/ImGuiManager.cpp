@@ -144,7 +144,7 @@ void ImGuiManager::RenderSettingWindow()
             ImGui::Text("Camera Position:(%.5f, %.5f, %.5f)", g_Camera->Position.x, g_Camera->Position.y, g_Camera->Position.z);
             ImGui::Text("Camera Front:(%.5f, %.5f, %.5f)", g_Camera->Front.x, g_Camera->Front.y, g_Camera->Front.z);
 
-            ImGui::SliderFloat("Camera MoveSpeed", &g_Config->cameraMoveSpeed, 0.0f, 7.0f);
+            ImGui::SliderFloat("Camera MoveSpeed", &g_Config->cameraMoveSpeed, 0.0f, 30.0f);
             ImGui::SliderFloat("Camera RotSensitivity", &g_Config->cameraRotSensitivity, 0.0f, 0.2f);
             ImGui::SliderFloat("Camera zNear", &g_Config->cameraZFar, 0.1f, 10.0f);
             ImGui::SliderFloat("Camera zFar", &g_Config->cameraZNear, 100.0f, 1000.0f);

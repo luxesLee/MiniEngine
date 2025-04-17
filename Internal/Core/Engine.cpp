@@ -19,7 +19,7 @@ Engine::~Engine()
 void Engine::Update()
 {
     Resize();
-    renderer->Update();    
+    renderer->Update(scene.get());    
 }
 
 void Engine::Render()
@@ -47,7 +47,7 @@ void Engine::UpdateScene(const SceneConfig& config)
         modelLoader->loadModel(scene.get(), modelConfig, config.matConfigMap);
     }
 
-    for(auto& light : config.lightConfigs)
+    for(const auto& light : config.lightConfigs)
     {
         scene->AppendLightMesh(light);
         scene->AppendLight(Light(light));
@@ -60,4 +60,5 @@ void Engine::UpdateScene(const SceneConfig& config)
 
     scene->BuildScene();
     scene->InitFBO();
+    scene->InitShadowMapFBO();
 }

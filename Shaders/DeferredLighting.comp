@@ -1,0 +1,460 @@
+#version 430 core
+
+layout (local_size_x = 32, local_size_y = 32) in;
+
+layout(rgba32f, binding = 0) uniform image2D outputImg;
+
+layout(binding = 0) uniform sampler2D GBuffer0;
+layout(binding = 1) uniform sampler2D GBuffer1;
+layout(binding = 2) uniform sampler2D GBuffer2;
+layout(binding = 3) uniform sampler2D GBuffer3;
+layout(binding = 4) uniform sampler2D DepthTex;
+layout(binding = 5) uniform samplerBuffer lightTex;
+layout(binding = 6) uniform sampler2D LTC1; // 逆变换矩阵
+layout(binding = 7) uniform sampler2D LTC2; // GGX预积分，菲涅尔项，0，几何衰减
+
+layout(binding = 8) uniform sampler2D shadowMap1;
+layout(binding = 9) uniform sampler2D shadowMap2;
+layout(binding = 10) uniform sampler2D shadowMap3;
+
+layout(binding = 11) uniform sampler2DArray cascadeShadowMap;
+
+layout(binding = 0) uniform CommonUBO
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 projectionView;
+    mat4 invProjection;
+    mat4 invViewProjection;
+    vec4 screenAndInvScreen;
+    vec4 cameraPosition;
+    int lightNum;
+};
+
+uniform mat4 lightMat;
+
+#define PI 3.1415926
+#define INVPI 0.31830989161
+#define MIN_ROUGHNESS 0.03
+#define MAX_LIGHTNUM 4
+
+struct Brdf
+{
+    vec3 diffuseAlbedo;
+    vec3 specularF0;
+    float roughness;
+};
+
+float DielectricSpecularToF0(float specular)
+{
+    return 0.08f * specular;
+}
+
+// F0 = mix(vec3(), albedo(baseColor), metallic);
+vec3 ComputeF0(float specular, vec3 baseColor, float metalness)
+{
+    return mix(DielectricSpecularToF0(specular).xxx, baseColor, metalness);
+}
+
+Brdf GetBrdfData(vec3 baseColor, float specularTint, float metallic, float roughness)
+{
+    Brdf data;
+    data.diffuseAlbedo = baseColor * (1 - metallic);
+    data.specularF0 = ComputeF0(specularTint, baseColor, metallic);
+    data.roughness = roughness;
+    return data;
+}
+
+#define DIRECTIONAL 0
+#define POINT 1
+#define SPOT 2
+#define QUAD 3
+struct Light
+{
+    vec4 position;
+    vec4 direction;
+    vec4 color;
+    int bActive;
+    float range;
+    int type;
+    float outerCosine;
+    float innerCosine;
+    vec3 u;
+    vec3 v;
+    float dis;
+};
+
+Light GetLightData(int index)
+{
+    int lightIndex = 6 * index;
+
+    Light data;
+    data.position = texelFetch(lightTex, lightIndex);
+    data.direction = texelFetch(lightTex, lightIndex + 1);
+    data.color = texelFetch(lightTex, lightIndex + 2);
+    
+    vec4 param4 = texelFetch(lightTex, lightIndex + 3);
+    vec4 param5 = texelFetch(lightTex, lightIndex + 4);
+    vec4 param6 = texelFetch(lightTex, lightIndex + 5);
+
+    data.bActive = floatBitsToInt(param4.x);
+    data.range = param4.y;
+    data.type = floatBitsToInt(param4.z);
+    data.outerCosine = param4.w;
+
+    data.innerCosine = param5.x;
+    data.u = param5.yzw;
+    data.v = param6.xyz;
+
+    if(data.type == QUAD)
+    {
+        data.direction.xyz = normalize(cross(data.u, data.v));
+    }
+
+    return data;
+}
+
+float GetLightAttenuation(Light light, vec3 position, out vec3 L)
+{
+    L = normalize(light.position.xyz - position);
+    float attenuation = 1.0f;
+    if(light.type == POINT)
+    {
+        float dis = length(light.position.xyz - position);
+        // attenuation = 
+    }
+    else if(light.type == SPOT)
+    {
+
+    }
+    else if(light.type == QUAD)
+    {
+
+    }
+    else if(light.type == DIRECTIONAL)
+    {
+        L = light.direction.xyz;
+    }
+    return attenuation;
+}
+
+float SampleShadowMap(vec3 uvd, float bias)
+{
+    if(uvd.z < 0.0f)
+    {
+        return 1.0f;
+    }
+
+    float visibility = (uvd.z <= texture(shadowMap1, uvd.xy).r + bias) ? 1.0 : 0.0;
+    return visibility;
+}
+
+float SampleShadowMapPCF(vec3 uvd, float bias)
+{
+    float visibility = 0;
+
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap1, 0));
+    for(int x = -1; x <= 1; x++)
+    {
+        for(int y = -1; y <= 1; y++)
+        {
+            float pcfDepth = texture(shadowMap1, uvd.xy + vec2(x, y) * texelSize).r;
+            visibility += (uvd.z <= pcfDepth + bias) ? 1.0 : 0.0;
+        }
+    }
+    return visibility / 9.0;
+}
+
+float GetShadowMapFactor(Light light, vec3 position, float bias)
+{
+    float shadowFactor = 1.0;
+
+    if(light.type == DIRECTIONAL)
+    {
+        vec4 shadowMapPos = lightMat * vec4(position, 1.0f);
+        vec3 UVD = shadowMapPos.xyz / shadowMapPos.w;
+        UVD.xyz = 0.5 * UVD.xyz + 0.5;
+        return SampleShadowMapPCF(UVD, bias);
+    }
+    
+
+    return shadowFactor;
+}
+
+float GetAttenuation(Light light, vec3 position, out vec3 L, vec3 normal)
+{
+    // 光源自身的衰减
+    float attenuation = GetLightAttenuation(light, position, L);
+    if(attenuation <= 0)
+    {
+        return 0;
+    }
+
+    float bias = max(0.05 * (1.0 - dot(normal, L)), 0.005);
+    // float bias = 0.001;
+
+    // 阴影图获得可见性
+    attenuation *= GetShadowMapFactor(light, position, bias);
+
+    // todo: Ray Marching
+
+    return attenuation;
+}
+
+// 法线分布项
+float D_GGX(vec3 N, vec3 H, float a)
+{
+    float a2 = clamp(a * a, 0.0001f, 1.0f);
+    float NdotH = clamp(dot(N, H), 0.0f, 1.0f);
+    
+    float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+    
+    return a2 / (max(denom, 0.001f));
+}
+
+// 几何遮蔽项
+float V_SmithGGX(vec3 N, vec3 V, vec3 L, float a)
+{
+    float a2 = clamp(a * a, 0.0001f, 1.0f);
+    float NdotV = clamp(abs(dot(N, V)) + 1e-5, 0.0f, 1.0f);
+    float NdotL = clamp(dot(N, L), 0.0f, 1.0f);
+
+    float G_V = NdotV + sqrt((NdotV - NdotV * a2) * NdotV + a2);
+    float G_L = NdotL + sqrt((NdotL - NdotL * a2) * NdotL + a2);
+    return 1.0f / (G_V * G_L);
+}
+
+// Fresnel项
+vec3 F_Schlick(vec3 V, vec3 H, vec3 F0)
+{
+    float VdotH = clamp(dot(V, H) + 1e-5, 0.0f, 1.0f);
+    return F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+}
+
+vec3 SpecularBRDF(vec3 N, vec3 V, vec3 L, vec3 specular, float roughness, out vec3 F)
+{
+    roughness = max(roughness, MIN_ROUGHNESS);
+
+    float a = roughness * roughness;
+    vec3 H = normalize(V + L);
+
+    float D = D_GGX(N, H, a);
+    float Vis = V_SmithGGX(N, V, L, a);
+    F = F_Schlick(V, H, specular);
+
+    // DFG
+    return D * Vis * F;
+}
+
+vec3 DefaultBRDF(vec3 L, vec3 V, vec3 N, vec3 diffuse, vec3 specular, float roughness)
+{
+    vec3 F;
+    vec3 specularBrdf = SpecularBRDF(N, V, L, specular, roughness, F);
+    // F -- Specular reflection ratio, so 1 - F is the diffuse ratio
+    vec3 diffuseBrdf = diffuse * INVPI * (1.0 - F); 
+
+    return diffuseBrdf + specularBrdf;
+}
+
+// LearnOpenGL
+// https://learnopengl-cn.github.io/08%20Guest%20Articles/2022/03%20Area%20Lights/
+// --------------------------------------------------------------------------
+
+// Vector form without project to the plane (dot with the normal)
+// Use for proxy sphere clipping
+vec3 IntegrateEdgeVec(vec3 v1, vec3 v2)
+{
+    // Using built-in acos() function will result flaws
+    // Using fitting result for calculating acos()
+    float x = dot(v1, v2);
+    float y = abs(x);
+
+    float a = 0.8543985 + (0.4965155 + 0.0145206*y)*y;
+    float b = 3.4175940 + (4.1616724 + y)*y;
+    float v = a / b;
+
+    float theta_sintheta = (x > 0.0) ? v : 0.5*inversesqrt(max(1.0 - x*x, 1e-7)) - v;
+
+    return cross(v1, v2)*theta_sintheta;
+}
+
+float IntegrateEdge(vec3 v1, vec3 v2)
+{
+    return IntegrateEdgeVec(v1, v2).z;
+}
+
+const float LUT_SIZE  = 64.0; // ltc_texture size
+const float LUT_SCALE = (LUT_SIZE - 1.0)/LUT_SIZE;
+const float LUT_BIAS  = 0.5/LUT_SIZE;
+
+// P is fragPos in world space (LTC distribution)
+vec3 LTC_Evaluate(vec3 N, vec3 V, vec3 P, mat3 Minv, vec3 points[4], bool twoSided)
+{
+    // construct orthonormal basis around N
+    vec3 T1, T2;
+    T1 = normalize(V - N * dot(V, N));
+    T2 = cross(N, T1);
+
+    // rotate area light in (T1, T2, N) basis
+    // 将QUAD光源转到法线空间
+    Minv = Minv * transpose(mat3(T1, T2, N));
+
+    // polygon (allocate 4 vertices for clipping)
+    vec3 L[4];
+    // transform polygon from LTC back to origin Do (cosine weighted)
+    // 将光源点逆变换到着色点的余弦分布上
+    L[0] = Minv * (points[0] - P);
+    L[1] = Minv * (points[1] - P);
+    L[2] = Minv * (points[2] - P);
+    L[3] = Minv * (points[3] - P);
+
+    // use tabulated horizon-clipped sphere
+    // check if the shading point is behind the light
+    // 判断着色点是否在光源后
+    vec3 dir = points[0] - P; // LTC space
+    vec3 lightNormal = cross(points[1] - points[0], points[3] - points[0]);
+    bool behind = (dot(dir, lightNormal) < 0.0);
+    if(!behind && !twoSided)
+    {
+        return vec3(0);
+    }
+
+    // cos weighted space
+    L[0] = normalize(L[0]);
+    L[1] = normalize(L[1]);
+    L[2] = normalize(L[2]);
+    L[3] = normalize(L[3]);
+
+    // integrate
+    vec3 vsum = vec3(0.0);
+    vsum += IntegrateEdgeVec(L[0], L[1]);
+    vsum += IntegrateEdgeVec(L[1], L[2]);
+    vsum += IntegrateEdgeVec(L[2], L[3]);
+    vsum += IntegrateEdgeVec(L[3], L[0]);
+
+    // form factor of the polygon in direction vsum
+    float len = length(vsum);
+
+    float z = vsum.z/len;
+    if (behind)
+        z = -z;
+
+    vec2 uv = vec2(z*0.5f + 0.5f, len); // range [0, 1]
+    uv = uv*LUT_SCALE + LUT_BIAS;
+
+    // Fetch the form factor for horizon clipping
+    float scale = texture(LTC2, uv).w;
+
+    float sum = len*scale;
+    if (!behind && !twoSided)
+        sum = 0.0;
+
+    // Outgoing radiance (solid angle) for the entire polygon
+    vec3 Lo_i = vec3(sum, sum, sum);
+    return Lo_i;
+}
+
+// --------------------------------------------------------------------------
+
+vec3 GetQuadLightingFromLTC(Light light, Brdf brdf, vec3 normal, vec3 position, vec3 viewDir)
+{
+    float NDotV = clamp(dot(normal, viewDir), 0.0, 1.0);
+    vec2 uv = vec2(brdf.roughness, sqrt(1.0f - NDotV));
+    uv = uv*LUT_SCALE + LUT_BIAS;
+    vec4 t1 = texture(LTC1, uv);
+    vec4 t2 = texture(LTC2, uv);
+
+    mat3 Minv = mat3(
+        vec3(t1.x, 0, t1.y),
+        vec3(  0,  1,    0),
+        vec3(t1.z, 0, t1.w)
+    );
+
+    vec3 xAxis = light.u - position, yAxis = light.v - position;
+    vec3 rectPoints[4];
+    rectPoints[0] = light.position.xyz;
+    rectPoints[1] = light.position.xyz + xAxis;
+    rectPoints[2] = light.position.xyz + yAxis + xAxis;
+    rectPoints[3] = light.position.xyz + yAxis;
+
+    vec3 diffuse = LTC_Evaluate(normal, viewDir, position, mat3(1), rectPoints, false);
+    vec3 specular = LTC_Evaluate(normal, viewDir, position, Minv, rectPoints, false);
+
+    // GGX预积分，菲涅尔项
+    specular *= brdf.specularF0 * t2.x + (1.0f - brdf.specularF0) * t2.y;
+    vec3 result = light.color.rgb * (specular + brdf.diffuseAlbedo * diffuse) * 10;
+    return result;
+}
+
+vec3 CalcDirectLighting(Light light, Brdf brdf, vec3 normal, vec3 position, vec3 viewDir)
+{
+    vec3 lightDirection;
+    float attenuation = GetAttenuation(light, position, lightDirection, normal);
+    if(attenuation <= 0.0f)
+    {
+        return vec3(0);
+    }
+
+    if(light.type == QUAD)
+    {
+        return GetQuadLightingFromLTC(light, brdf, normal, position, viewDir) * attenuation;
+    }
+
+    lightDirection = -lightDirection;
+    float NDotL = clamp(dot(normal, lightDirection), 0, 1.0f);
+    if(NDotL == 0.0f)
+    {
+        return vec3(0);
+    }
+
+    return DefaultBRDF(lightDirection, viewDir, normal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) 
+            * NDotL * attenuation * light.color.rgb;
+}
+
+void main()
+{
+    ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+
+    vec4 param0 = texelFetch(GBuffer0, uv, 0);
+    vec4 param1 = texelFetch(GBuffer1, uv, 0);
+    vec4 param2 = texelFetch(GBuffer2, uv, 0);
+    vec4 param3 = texelFetch(GBuffer3, uv, 0);
+    float depth = texelFetch(DepthTex, uv, 0).r;
+
+    vec3 worldPosition = param0.xyz;
+    vec3 worldNormal = param1.xyz;
+    float metallic = param2.x;
+    float specular = param2.y;
+    float roughness = param2.z;
+    vec3 baseColor = param3.rgb;
+    vec3 emission = vec3(param0.a, param1.a, param2.a);
+
+    Brdf brdf = GetBrdfData(baseColor, specular, metallic, roughness);
+    vec3 viewDirection = worldPosition - cameraPosition.xyz;
+
+    // 直接光照
+    vec3 directLighting = vec3(0.0);
+    for(int i = 0; i < lightNum; i++)
+    {
+        Light light = GetLightData(i);
+        // if(light.bActive > 0)
+        {
+            directLighting += CalcDirectLighting(light, brdf, worldNormal, worldPosition, viewDirection);
+        }
+    }
+
+    // vec4 shadowMapPos = lightMat * vec4(worldPosition, 1.0f);
+    // vec3 UVD = shadowMapPos.xyz / shadowMapPos.w;
+    // UVD.xyz = 0.5 * UVD.xyz + 0.5;
+    // directLighting = UVD;
+
+    // 处理AO
+
+
+    // 自发光
+    directLighting += emission;
+
+    imageStore(outputImg, uv, vec4(directLighting, 1.0));
+}

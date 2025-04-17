@@ -5,9 +5,9 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 uv;
 layout(location = 3) in float matID;    // 这里用int有错误
 
-layout(location = 0) noperspective out vec3 WorldPosition;
-layout(location = 1) noperspective out vec3 WorldNormal;
-layout(location = 2) noperspective out vec2 TexCoord;
+layout(location = 0) out vec3 WorldPosition;
+layout(location = 1) out vec3 WorldNormal;
+layout(location = 2) out vec2 TexCoord;
 layout(location = 3) flat out int MatID;
 
 layout(binding = 0) uniform CommonUBO
@@ -19,7 +19,8 @@ layout(binding = 0) uniform CommonUBO
     mat4 invProjection;
     mat4 invViewProjection;
     vec4 screenAndInvScreen;
-    vec3 cameraPosition;
+    vec4 cameraPosition;
+    int lightNum;
 };
 
 layout(binding = 0)uniform sampler2D transformTex;

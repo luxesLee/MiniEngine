@@ -48,18 +48,18 @@ entt::entity ModelLoader::loadModel(Scene *scene, const ModelConfig& modelConfig
     }
     else if(endsWith(modelConfig.modelPath, ".gltf"))
     {
-        return loadGLTFModel(scene, modelConfig.modelPath, modelConfig.transform);
+        return loadGLTFModel(scene, modelConfig, matConfigMap);
     }
     return entt::null;
 }
 
-entt::entity ModelLoader::loadGLTFModel(Scene *scene, const std::string& filePath, const glm::mat4& transform)
+entt::entity ModelLoader::loadGLTFModel(Scene *scene, const ModelConfig& modelConfig, const MaterialConfigMap& matConfigMap)
 {
     tinygltf::TinyGLTF loader;
     tinygltf::Model gltfModel;
     std::string err, warn;
 
-    bool ret = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, filePath);
+    bool ret = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, modelConfig.modelPath);
     if(!ret || !err.empty())
     {
         if(!err.empty())
@@ -80,7 +80,7 @@ entt::entity ModelLoader::loadGLTFModel(Scene *scene, const std::string& filePat
     loadMeshFromGLTFModel(scene, gltfModel, meshMap);
     loadMatFromGLTFModel(scene, gltfModel);
     loadTexturesFromGLTFModel(scene, gltfModel);
-    loadInstanceFromGLTFModel(scene, gltfModel, meshMap, transform);
+    loadInstanceFromGLTFModel(scene, gltfModel, meshMap, modelConfig.transform);
 
     // entt::entity entityModel = reg.create();
     return entt::null;
@@ -230,7 +230,7 @@ void ModelLoader::loadMeshFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel
                 mesh->normals.push_back(normals[indices[v]]);
                 mesh->uvs.push_back(uvs[indices[v]]);
             }
-            mesh->indices.insert(mesh->indices.end(), indices.begin(), indices.end());
+            // mesh->indices.insert(mesh->indices.end(), indices.begin(), indices.end());
 
             scene->meshes.push_back(mesh);
             meshMap[meshId].push_back(std::make_pair<int, int>(scene->meshes.size() - 1, scene->materials.size() + prim.material));

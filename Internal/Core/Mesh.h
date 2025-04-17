@@ -69,6 +69,7 @@ public:
     MeshBatch()
     {
         instanceCount = 0;
+        bDrawElement = false;
     }
     ~MeshBatch()
     {
@@ -115,15 +116,19 @@ public:
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 0, (void*)0);
         glEnableVertexAttribArray(3);
 
-        if(indices.size() == 0)
-        {
-            indices.resize(vertices.size());
-            std::iota(indices.begin(), indices.end(), 0);
-        }
+        // if(indices.size() == 0)
+        // {
+        //     indices.resize(vertices.size());
+        //     std::iota(indices.begin(), indices.end(), 0);
+        // }
 
-        glGenBuffers(1, &ebo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(Uint32), indices.data(), GL_STATIC_DRAW);
+        if(indices.size() > 0)
+        {
+            glGenBuffers(1, &ebo);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(Uint32), indices.data(), GL_STATIC_DRAW);
+            bDrawElement = true;
+        }
 
         glBindVertexArray(0);
     }
@@ -140,6 +145,8 @@ public:
 
     Uint GetInstanceCount() {return instanceCount;}
     Uint GetNumPerMeshBatch() {return indices.size();}
+    Uint GetNumVertices() const {return vertices.size();}
+    Bool GetDrawElement() const {return bDrawElement;}
 
 private:
     std::vector<glm::vec3> vertices;
@@ -148,6 +155,7 @@ private:
     std::vector<glm::vec2> uvs;
     std::vector<Uint32> materialIDs;
     Uint instanceCount;
+    Bool bDrawElement;
 
 private:
     GLuint vao;

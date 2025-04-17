@@ -4,17 +4,11 @@ class FrameGraph;
 class FrameGraphBlackboard;
 class Scene;
 
-class PostProcessPass
+class DeferredLightingPass
 {
 public:
-    PostProcessPass()
-    {
-    }
-    ~PostProcessPass()
-    {
-    }
-
+    DeferredLightingPass() {}
+    ~DeferredLightingPass() {}
+    
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-
-    void Init();
 };

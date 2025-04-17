@@ -18,13 +18,13 @@ struct TextureInfo
     {
     }
 
-    TextureInfo(TextureType _texType, GLenum _internalFormat, uint32_t _width, uint32_t _height, GLenum _format, GLenum _type, void* _data)
-        : texType(_texType), internalFormat(_internalFormat), width(_width), height(_height), format(_format), type(_type), data(_data)
+    TextureInfo(TextureType _texType, GLenum _internalFormat, uint32_t _width, uint32_t _height, GLenum _format, GLenum _type, void* _data, GLuint _minFilter, GLuint _magFilter)
+        : texType(_texType), internalFormat(_internalFormat), width(_width), height(_height), format(_format), type(_type), data(_data), minFilter(_minFilter), magFilter(_magFilter)
     {
     }
 
-    TextureInfo(TextureType _texType, GLenum _internalFormat, uint32_t _width, uint32_t _height, uint32_t _dataSize, GLenum _format, GLenum _type, void* _data)
-        : texType(_texType), internalFormat(_internalFormat), width(_width), height(_height), dataSize(_dataSize), format(_format), type(_type), data(_data)
+    TextureInfo(TextureType _texType, GLenum _internalFormat, uint32_t _width, uint32_t _height, uint32_t _dataSize, GLenum _format, GLenum _type, void* _data, GLuint _minFilter, GLuint _magFilter)
+        : texType(_texType), internalFormat(_internalFormat), width(_width), height(_height), dataSize(_dataSize), format(_format), type(_type), data(_data), minFilter(_minFilter), magFilter(_magFilter)
     {
     }
 
@@ -40,6 +40,7 @@ struct TextureInfo
     GLenum internalFormat;
     GLenum format;
     GLenum type;
+    GLuint minFilter, magFilter;
 };
 
 struct GPUTexture

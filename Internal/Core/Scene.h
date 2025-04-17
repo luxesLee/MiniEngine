@@ -43,6 +43,9 @@ public:
     void InitFBO();
     void DeleteFBO();
 
+    void InitShadowMapFBO();
+    RadeonRays::bbox GetSceneBoundingBox() {return sceneBvh->Bounds();}
+
     GLuint outputFBO;
     GLuint outputTex[2];
     int curOutputTex;
@@ -55,8 +58,17 @@ public:
     GLuint toneMappingTexId;
 
     GLuint deferredBasePassFBO;
-    GLuint GBufferTexId0, GBufferTexId1, GBufferTexId2, GBufferTexId3;
+    GLuint GBufferTexId[4];
     GLuint basePassDepthStencilTexId;
+
+    GLuint shadowPassFBO;
+    std::vector<GLuint> shadowPassDepthTexIds;
+
+    std::vector<glm::mat4> lightMats;
+    std::vector<glm::mat4>& GetLightMats() {return lightMats;}
+
+    GPUTexture LTC1Tex;
+    GPUTexture LTC2Tex;
 
 private:
     void UploadDataToGpu();
@@ -78,6 +90,11 @@ public:
     }
     void AppendLightMesh(const Light& light);
 
+    const std::vector<Light>& GetSceneLights() const 
+    {
+        return lights;
+    }
+
 public:
     const std::vector<MeshBatch*>& GetMeshBatches() const
     {
@@ -87,6 +104,8 @@ public:
 private:
     std::vector<Mesh*> meshes;
     std::vector<MeshInstance> meshInstances;
+    std::vector<Material> materials;
+    std::vector<Light> lights;
 
     void CombineMesh();
     std::vector<MeshBatch*> meshBatches;
@@ -105,8 +124,6 @@ private:
     std::vector<Indice> indices;
     std::vector<vec3> normals;
     std::vector<vec2> uvs;
-    std::vector<Material> materials;
-    std::vector<Light> lights;
 
     std::vector<mat4> transforms;
     std::vector<Texture*> textures;

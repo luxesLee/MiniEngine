@@ -1,4 +1,4 @@
-#include "BasePass.h"
+#include "GBufferPass.h"
 #include "Render/ShaderManager.h"
 #include "Core/Config.h"
 #include "Core/Shader.h"
@@ -7,7 +7,7 @@
 #include "fg/FrameGraph.hpp"
 #include "fg/Blackboard.hpp"
 
-void BasePass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, scene->deferredBasePassFBO);
     Shader* shaderBasePass = g_ShaderManager.GetShader("BasePass");
@@ -34,6 +34,8 @@ void BasePass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *
     glBindTexture(GL_TEXTURE_2D, scene->getTransformTexId());
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene->getMatTexId());
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
 
     auto meshBatches = scene->GetMeshBatches();
     Int instanceBase = 0, curInstanceCount = 0;
@@ -42,7 +44,14 @@ void BasePass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *
         curInstanceCount = meshBatch->GetInstanceCount();
         shaderBasePass->setInt("instanceBase", instanceBase);
         meshBatch->Bind();
-        glDrawElementsInstanced(GL_TRIANGLES, meshBatch->GetNumPerMeshBatch(), GL_UNSIGNED_INT, 0, curInstanceCount);
+        if(meshBatch->GetDrawElement())
+        {
+            glDrawElementsInstanced(GL_TRIANGLES, meshBatch->GetNumPerMeshBatch(), GL_UNSIGNED_INT, 0, curInstanceCount);
+        }
+        else
+        {
+            glDrawArraysInstanced(GL_TRIANGLES, 0, meshBatch->GetNumVertices(), curInstanceCount);
+        }
         meshBatch->UnBind();
         instanceBase += curInstanceCount;
     }
@@ -52,7 +61,7 @@ void BasePass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *
     glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
-void BasePass::AddPreDepthPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void GBufferPass::AddPreDepthPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
     Shader* shaderPreDepthPass = g_ShaderManager.GetShader("PreDepthPass");
     if(!shaderPreDepthPass)

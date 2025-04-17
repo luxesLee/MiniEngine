@@ -25,16 +25,16 @@ GPUTexture RenderResHelper::generateGPUTexture(TextureInfo &textureInfo)
     {
         glBindTexture(GL_TEXTURE_2D, gpuTexture.texId);
         glTexImage2D(GL_TEXTURE_2D, 0, textureInfo.internalFormat, textureInfo.width, textureInfo.height, 0, textureInfo.format, textureInfo.type, textureInfo.data);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, textureInfo.magFilter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, textureInfo.minFilter);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
     else if(textureInfo.texType == TextureType::Image3DTextureArray2D)
     {
         glBindTexture(GL_TEXTURE_2D_ARRAY, gpuTexture.texId);
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, textureInfo.internalFormat, textureInfo.width, textureInfo.height, textureInfo.dataSize, 0, textureInfo.format, textureInfo.type, textureInfo.data);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, textureInfo.magFilter);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, textureInfo.minFilter);
         glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     }
     return gpuTexture;

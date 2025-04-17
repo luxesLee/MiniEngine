@@ -24,7 +24,8 @@ layout(binding = 0) uniform CommonUBO
     mat4 invProjection;
     mat4 invViewProjection;
     vec4 screenAndInvScreen;
-    vec3 cameraPosition;
+    vec4 cameraPosition;
+    int lightNum;
 };
 
 layout(binding = 1) uniform PathTracingUBO
@@ -32,7 +33,6 @@ layout(binding = 1) uniform PathTracingUBO
     int maxDepth;
     int accumulateFrames;
     int topBVHIndex;
-    int lightNum;
 };
 
 #define FLT_MAX 3.402823466e+38
@@ -843,7 +843,7 @@ void main()
         {
             Material mat = GetMatrixData(hitInfo);
             Brdf brdf = GetBrdfData(mat);
-            vec3 wo = normalize(cameraPosition - hitInfo.worldPosition);
+            vec3 wo = normalize(cameraPosition.xyz - hitInfo.worldPosition);
 
             if(length(mat.emission) != 0) // 命中光源，不递归计算
             {

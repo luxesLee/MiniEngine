@@ -4,18 +4,19 @@ class FrameGraph;
 class FrameGraphBlackboard;
 class Scene;
 
-class BasePass
+class GBufferPass
 {
 public:
-    BasePass()
+    GBufferPass()
     {
     }
-    ~BasePass()
+    ~GBufferPass()
     {
     }
 
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    void AddPreDepthPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-
     void Init();
+
+private:
+    void AddPreDepthPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 };

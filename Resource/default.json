@@ -12,7 +12,7 @@
       ],
       "zoom": 45.0,
       "near": 1.0,
-      "far": 700.0
+      "far": 100.0
     },
     "skybox": {
       "texture": [ "Resources/Textures/Skybox/sunsetcube1024.dds" ]

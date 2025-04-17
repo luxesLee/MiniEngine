@@ -22,6 +22,7 @@ public:
 
     uint32_t screenWidth;
     uint32_t screenHeight;
+    float Zoom;
     bool bResize;
 
     static Camera* getInstance()
@@ -32,7 +33,7 @@ public:
 
 private:
     glm::vec3 WorldUp = glm::vec3(0, 1, 0);
-    float Zoom;
+
     float pitch;
     float yaw;
 

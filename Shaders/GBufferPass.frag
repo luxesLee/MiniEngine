@@ -1,11 +1,11 @@
 #version 430 core
 
-layout(location = 0) noperspective in vec3 WorldPosition;
-layout(location = 1) noperspective in vec3 WorldNormal;
-layout(location = 2) noperspective in vec2 TexCoord;
+layout(location = 0) in vec3 WorldPosition;
+layout(location = 1) in vec3 WorldNormal;
+layout(location = 2) in vec2 TexCoord;
 layout(location = 3) flat in int MatID;
 
-// GBuffer0 WorldPos(RGB8)
+// GBuffer0 WorldPos(RGB8)|AO(A8)
 // GBuffer1 Normal(RGB8)
 // GBuffer2 Metallic(R8)|Specular(R8)|Roughness(R8)|
 // GBuffer3 BaseColor(RGB8)
@@ -15,6 +15,7 @@ layout(location = 2) out vec4 GBuffer2;
 layout(location = 3) out vec4 GBuffer3;
 
 layout(binding = 1) uniform sampler2D matTex;
+layout(binding = 2)uniform sampler2DArray textureMapsArrayTex;
 
 struct Medium
 {
@@ -106,19 +107,19 @@ Material GetMatrixData(int matID, vec2 uv)
     data.alphaMode          = int(param8.y);
     data.alphaCutoff        = param8.z;
 
-    // if(texIDs.x >= 0)
-    // {
-    //     vec4 col = texture(textureMapsArrayTex, vec3(uv, texIDs.x));
-    //     data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
-    //     data.opacity *= col.a;
-    // }
+    if(texIDs.x >= 0)
+    {
+        vec4 col = texture(textureMapsArrayTex, vec3(uv, texIDs.x));
+        data.baseColor.rgb *= pow(col.rgb, vec3(2.2));
+        data.opacity *= col.a;
+    }
 
-    // if(texIDs.y >= 0)
-    // {
-    //     vec2 matRgh = texture(textureMapsArrayTex, vec3(uv, texIDs.y)).bg;
-    //     data.metallic = matRgh.x;
-    //     data.roughness = max(matRgh.y, 0.001);
-    // }
+    if(texIDs.y >= 0)
+    {
+        vec2 matRgh = texture(textureMapsArrayTex, vec3(uv, texIDs.y)).bg;
+        data.metallic = matRgh.x;
+        data.roughness = max(matRgh.y, 0.001);
+    }
 
     // // if(texIDs.z >= 0)
     // // {
@@ -126,10 +127,10 @@ Material GetMatrixData(int matID, vec2 uv)
     // //     texNormal = normalize(texNormal * 2.0 - 1.0);
     // // }
 
-    // if(texIDs.w >= 0)
-    // {
-    //     data.emission = pow(texture(textureMapsArrayTex, vec3(uv, texIDs.w)).rgb, vec3(2.2));
-    // }
+    if(texIDs.w >= 0)
+    {
+        data.emission = pow(texture(textureMapsArrayTex, vec3(uv, texIDs.w)).rgb, vec3(2.2));
+    }
 
     return data;
 }
@@ -139,6 +140,10 @@ void main()
     GBuffer0.rgb = WorldPosition;
     GBuffer1.rgb = WorldNormal;
     Material mat = GetMatrixData(MatID, TexCoord);
-    GBuffer2.r = MatID;
+    GBuffer2.rgb = vec3(mat.metallic, mat.specularTint, mat.roughness);
     GBuffer3.rgb = mat.baseColor;
+    GBuffer3.a = MatID;
+    GBuffer0.a = mat.emission.r;
+    GBuffer1.a = mat.emission.g;
+    GBuffer2.a = mat.emission.b;
 }

@@ -23,7 +23,7 @@ public:
 
 private:
 
-    entt::entity loadGLTFModel(Scene *scene, const std::string& filePath, const glm::mat4& transform);
+    entt::entity loadGLTFModel(Scene *scene, const ModelConfig& modelConfig, const MaterialConfigMap& matConfigMap);
     void loadMatFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel);
     void loadMeshFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel, std::map<int, std::vector<std::pair<int, int>>>& meshMap);
     void loadTexturesFromGLTFModel(Scene* scene, tinygltf::Model& gltfModel);

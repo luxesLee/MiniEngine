@@ -20,17 +20,17 @@ Renderer::Renderer()
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
-    glBufferData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + 2 * sizeof(glm::vec4), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + 2 * sizeof(glm::vec4) + sizeof(Int), NULL, GL_DYNAMIC_DRAW);
     glGenBuffers(1, &PathTracingUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 1, PathTracingUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
-    glBufferData(GL_UNIFORM_BUFFER, 4 * sizeof(int), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(int), NULL, GL_DYNAMIC_DRAW);
 }
 
-void Renderer::Update()
+void Renderer::Update(Scene* scene)
 {
     // we will update ubo and complete the culling in this function
-    UpdateUBO();
+    UpdateUBO(scene);
     DoCulling();
 
     if(denoisePass && g_Config->curDenoise != denoisePass->GetType())
@@ -67,17 +67,13 @@ void Renderer::Render(Scene *scene)
     // todo: forward and deferred
     switch (g_Config->lightMode)
     {
-    case LightMode::Forward:
-        ForwardRendering(fg, blackboard, scene);
-        break;
+    case LightMode::Forward: ForwardRendering(fg, blackboard, scene); break;
     case LightMode::Deferred:
     case LightMode::TiledDeferred:
     case LightMode::ClusterDeferred:
         DeferredRendering(fg, blackboard, scene);
         break;
-    case LightMode::PathTracing:
-        PathTracing(fg, blackboard, scene);
-        break;
+    case LightMode::PathTracing: PathTracing(fg, blackboard, scene); break;
     }
 
     // todo: rendergraph
@@ -103,7 +99,7 @@ void Renderer::Resize()
     glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
 }
 
-void Renderer::UpdateUBO()
+void Renderer::UpdateUBO(Scene* scene)
 {
     if(CommonUBO)
     {
@@ -125,9 +121,21 @@ void Renderer::UpdateUBO()
         glBufferSubData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4), sizeof(glm::vec4), &g_Camera->GetScreenAndInvScreen());
         // cameraPosition
         glBufferSubData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + sizeof(glm::vec4), sizeof(glm::vec4), &g_Camera->Position);
+        // lightNum
+        int lightNum = scene->getLightNum();
+        glBufferSubData(GL_UNIFORM_BUFFER, 6 * sizeof(glm::mat4) + 2 * sizeof(glm::vec4), sizeof(Int), &lightNum);
     }
 
-
+    if(PathTracingUBO)
+    {
+        g_Config->accumulateFrames++;
+        glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
+        int maxDepth = 1;
+        int topBVHIndex = scene->getTopBVHIndex();
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Int), &g_Config->maxRayTracingDepth);
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Int), sizeof(Int), &g_Config->accumulateFrames);
+        glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(Int), sizeof(Int), &topBVHIndex);
+    }
 }
 
 void Renderer::DoCulling()
@@ -143,26 +151,31 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
 {
     basePass.AddPass(fg, blackboard, scene);
 
+    if(g_Config->bShadeShadow)
+    {
+        glViewport(0, 0, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
+        shadowRenderer.AddPass(fg, blackboard, scene);
+        glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
 
+        if(g_Config->bDebugShadowMap)
+        {
+            // glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+            // AddPassVisualizeShadowMap({matTemp});
+        }
+    }
 
+    switch (g_Config->lightMode)
+    {
+    case LightMode::Deferred: deferredLightingPass.AddPass(fg, blackboard, scene); break;
+    case LightMode::TiledDeferred: break;
+    case LightMode::ClusterDeferred: break;
+    }
     
+
 }
 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
-    if(PathTracingUBO)
-    {
-        g_Config->accumulateFrames++;
-        glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
-        int maxDepth = 1;
-        int topBVHIndex = scene->getTopBVHIndex();
-        int lightNum = scene->getLightNum();
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(int), &g_Config->maxRayTracingDepth);
-        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(int), sizeof(int), &g_Config->accumulateFrames);
-        glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(int), sizeof(int), &topBVHIndex);
-        glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(int), sizeof(int), &lightNum);
-    }
-
     pathTracingPass.AddPass(fg, blackboard, scene);
     if(g_Config->curToneMapping > 0)
     {
