@@ -46,7 +46,7 @@ public:
     std::string title = "MiniEngine";
 
     // sceneConfigPath
-    std::string configPath = "../../Resource/newsponza.json";
+    std::string configPath = "../../Resource/Cornell_box_Point_Light.json";
 
     // camera
     Float cameraMoveSpeed = 20.0f;
@@ -63,11 +63,24 @@ public:
     Uint32 texWidth = 512, texHeight = 512;
 
     Bool bPreDepthPass = false;
+
+    // shadow
     Bool bShadeShadow = true;
+    Bool bPCF = true;
     Bool bCascadeShadow = false;
     Bool bDebugShadowMap = false;
-    Uint32 cascadeLevel = 4;
-    Uint32 shadowDepthWidth = 2048, shadowDepthHeight = 2048;
+    Int cascadeLevel = 4;
+    Uint32 shadowDepthWidth = 1024, shadowDepthHeight = 1024;
+
+    // Indirect Lighting
+    Bool bSSAO = true;
+    Int SSAOKernelSize = 32;
+
+    Bool bDDGI = false;
+    Bool bVXGI = true;
+    Bool bSSR = true;
+
+    // Debug
 
     // action
     Bool bRenderdocCapture = false;

@@ -277,7 +277,7 @@ void Scene::InitFBO()
 
         glGenTextures(1, &pathTracingTexId);
         glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
@@ -285,7 +285,7 @@ void Scene::InitFBO()
 
         glGenTextures(1, &accumTexId);
         glBindTexture(GL_TEXTURE_2D, accumTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
@@ -303,28 +303,28 @@ void Scene::InitFBO()
 
         glGenTextures(1, &GBufferTexId[0]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[0]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GBufferTexId[0], 0);
 
         glGenTextures(1, &GBufferTexId[1]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[1]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, GBufferTexId[1], 0);
 
         glGenTextures(1, &GBufferTexId[2]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[2]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, GBufferTexId[2], 0);
 
         glGenTextures(1, &GBufferTexId[3]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[3]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, GBufferTexId[3], 0);
@@ -336,7 +336,7 @@ void Scene::InitFBO()
 
         glGenTextures(1, &basePassDepthStencilTexId);
         glBindTexture(GL_TEXTURE_2D, basePassDepthStencilTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, g_Config->screenWidth, g_Config->screenHeight, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, basePassDepthStencilTexId, 0);
@@ -353,7 +353,7 @@ void Scene::InitFBO()
 
         glGenTextures(1, &toneMappingTexId);
         glBindTexture(GL_TEXTURE_2D, toneMappingTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, toneMappingTexId, 0);
@@ -388,14 +388,23 @@ void Scene::InitShadowMapFBO()
     glGenFramebuffers(1, &shadowPassFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowPassFBO);
 
+    std::sort(lights.begin(), lights.end(), [&](Light& light1, Light& light2)
+    {
+        return light1.type < light2.type;
+    });
+
     constexpr Float bordercolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    shadowPassDepthTexIds.resize(lights.size());
+    shadowMapCaches.resize(lights.size());
     for(Int i = 0; i < lights.size(); i++)
     {
-        glGenTextures(1, &shadowPassDepthTexIds[i]);
+        ShadowMapCache& cache = shadowMapCaches[i];
+        cache.light = &lights[i];
+
+        glGenTextures(1, &cache.shadowPassDepthTexIds);
         if(lights[i].type == LightType::DIRECTIONAL_LIGHT && g_Config->bCascadeShadow)
         {
-            glBindTexture(GL_TEXTURE_2D_ARRAY, shadowPassDepthTexIds[i]);
+            cache.bMultiMats = true;
+            glBindTexture(GL_TEXTURE_2D_ARRAY, cache.shadowPassDepthTexIds);
             glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 
                 g_Config->cascadeLevel + 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
@@ -407,7 +416,8 @@ void Scene::InitShadowMapFBO()
         }
         else if(lights[i].type == LightType::POINT_LIGHT)
         {
-            glBindTexture(GL_TEXTURE_CUBE_MAP, shadowPassDepthTexIds[i]);
+            cache.bMultiMats = true;
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cache.shadowPassDepthTexIds);
             for(Int j = 0; j < 6; j++)
             {
                 glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, 
@@ -422,7 +432,8 @@ void Scene::InitShadowMapFBO()
         }
         else
         {
-            glBindTexture(GL_TEXTURE_2D, shadowPassDepthTexIds[i]);
+            cache.bMultiMats = false;
+            glBindTexture(GL_TEXTURE_2D, cache.shadowPassDepthTexIds);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 
                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 

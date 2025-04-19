@@ -33,15 +33,57 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
     glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, scene->LTC2Tex.texId);
 
-    glActiveTexture(GL_TEXTURE8);
-    glBindTexture(GL_TEXTURE_2D, scene->shadowPassDepthTexIds[0]);
-
     // 输出
     glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+    // Uniform
     shaderDeferredLighting->use();
+    shaderDeferredLighting->setBool("bPCF", g_Config->bPCF);
+    shaderDeferredLighting->setBool("bCascade", g_Config->bCascadeShadow);
+    shaderDeferredLighting->setInt("cascadeLevel", g_Config->cascadeLevel);
 
-    shaderDeferredLighting->setMat4("lightMat", scene->lightMats[0]);
+    int pointTexIndex = 0, otherTexIndex = 0;
+    for(Int i = 0; i < scene->shadowMapCaches.size(); i++)
+    {
+        auto& shadowMapCache = scene->shadowMapCaches[i];
+        auto light = shadowMapCache.light;
+        if(!light || (light->type == DIRECTIONAL_LIGHT && i > 0))
+        {
+            continue;
+        }
+
+        if(light->type == DIRECTIONAL_LIGHT)
+        {
+            if(!g_Config->bCascadeShadow)
+            {
+                glActiveTexture(GL_TEXTURE8);
+                glBindTexture(GL_TEXTURE_2D, shadowMapCache.shadowPassDepthTexIds);
+                shaderDeferredLighting->setMat4("lightMat", shadowMapCache.lightMats[0]);
+            }
+            else
+            {
+                glActiveTexture(GL_TEXTURE9);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapCache.shadowPassDepthTexIds);
+                for(Int cascadeIndex = 0; cascadeIndex < g_Config->cascadeLevel; cascadeIndex++)
+                {
+                    shaderDeferredLighting->setMat4("cascadeMat[" + std::to_string(cascadeIndex) + "]", shadowMapCache.lightMats[cascadeIndex]);
+                }
+            }
+        }
+        else if(light->type == POINT_LIGHT && pointTexIndex < 2)
+        {
+            glActiveTexture(GL_TEXTURE10 + pointTexIndex);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, shadowMapCache.shadowPassDepthTexIds);
+            pointTexIndex++;
+        }
+        else if(otherTexIndex < 2)
+        {
+            glActiveTexture(GL_TEXTURE12 + otherTexIndex);
+            glBindTexture(GL_TEXTURE_2D, shadowMapCache.shadowPassDepthTexIds);
+            otherTexIndex++;
+        }
+    }
+
 
     glDispatchCompute(g_Config->wholeWidth / 32, g_Config->screenHeight / 32, 1);
 }

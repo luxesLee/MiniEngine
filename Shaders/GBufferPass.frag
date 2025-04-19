@@ -6,9 +6,9 @@ layout(location = 2) in vec2 TexCoord;
 layout(location = 3) flat in int MatID;
 
 // GBuffer0 WorldPos(RGB8)|AO(A8)
-// GBuffer1 Normal(RGB8)
-// GBuffer2 Metallic(R8)|Specular(R8)|Roughness(R8)|
-// GBuffer3 BaseColor(RGB8)
+// GBuffer1 Normal(RGB8)|Emission.r(A8)
+// GBuffer2 Metallic(R8)|Specular(R8)|Roughness(R8)|Emission.g(A8)
+// GBuffer3 BaseColor(RGB8)|Emission.b(A8)
 layout(location = 0) out vec4 GBuffer0;
 layout(location = 1) out vec4 GBuffer1;
 layout(location = 2) out vec4 GBuffer2;
@@ -143,7 +143,7 @@ void main()
     GBuffer2.rgb = vec3(mat.metallic, mat.specularTint, mat.roughness);
     GBuffer3.rgb = mat.baseColor;
     GBuffer3.a = MatID;
-    GBuffer0.a = mat.emission.r;
-    GBuffer1.a = mat.emission.g;
-    GBuffer2.a = mat.emission.b;
+    GBuffer1.a = mat.emission.r;
+    GBuffer2.a = mat.emission.g;
+    GBuffer3.a = mat.emission.b;
 }

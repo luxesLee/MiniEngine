@@ -68,12 +68,12 @@ public:
 
     glm::mat4 GetProjectionMatrix()
     {
-        return glm::perspective(glm::radians(Zoom), screenWidth * 1.0f / screenHeight, g_Config->cameraZNear, g_Config->cameraZFar);
+        return glm::perspective(glm::radians(Zoom), g_Config->screenWidth * 1.0f / g_Config->screenHeight, g_Config->cameraZNear, g_Config->cameraZFar);
     }
 
     glm::vec4 GetScreenAndInvScreen()
     {
-        return glm::vec4(screenWidth, screenHeight, 1.0 / screenWidth, 1.0 / screenHeight);
+        return glm::vec4(g_Config->screenWidth, screenHeight, 1.0 / g_Config->screenWidth, 1.0 / screenHeight);
     }
 
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)

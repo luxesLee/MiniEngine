@@ -818,7 +818,7 @@ void main()
     uint rng = RNG_init(uint(gl_FragCoord.x + gl_FragCoord.y * screenAndInvScreen.x), accumulateFrames, 16);
     vec2 offset = vec2(RNG_next(rng), RNG_next(rng));
     vec2 samplePixel = gl_FragCoord.xy + mix(vec2(-0.5f), vec2(0.5f), offset);
-    vec2 ndcPixel = 2.0f * (samplePixel / screenAndInvScreen.xy) - 1.0f;
+    vec2 ndcPixel = 2 * (samplePixel / screenAndInvScreen.xy) - 1.0f;
 
     // Inverse深度缓冲，此处1代表近平面，0代表原平面
     vec4 start = invViewProjection * vec4(ndcPixel, 1.0f, 1.0f);
@@ -862,8 +862,11 @@ void main()
                     float visibility = TraceShadow(hitInfo.worldPosition, lightInfo, vec2(RNG_next(rng), RNG_next(rng)));
                     vec3 wi = normalize(-lightInfo.direction.xyz);
                     float NdotL = clamp(dot(hitInfo.worldNormal, wi), 0.0f, 1.0f); 
-                    float attenuation = lightInfo.type == DIRECTIONAL ? 1.0f : (1.0f / (1 + lightInfo.dis * lightInfo.dis));
+                    vec3 lightDirection = lightInfo.position.xyz - hitInfo.worldPosition;
+                    float dis = length(lightDirection);
+                    float attenuation = lightInfo.type == DIRECTIONAL ? 1.0f : clamp(1.0f - (dis * dis) / (lightInfo.range * lightInfo.range), 0.0f, 1.0f);
                     vec3 directLighting = DefaultBRDF(wi, wo, hitInfo.worldNormal, brdf.diffuseAlbedo, brdf.specularF0, brdf.roughness) * visibility * lightInfo.color.rgb * attenuation * NdotL;
+
                     // 计算直接光对原着色点的贡献
                     radiance += lightWeight * (directLighting) * throughput / pdf;
                 }

@@ -22,6 +22,32 @@ struct Indice
     Uint32 x, y, z;
 };
 
+struct ShadowMapCache
+{
+    ShadowMapCache()
+    {
+    }
+    ~ShadowMapCache()
+    {
+    }
+    ShadowMapCache(const ShadowMapCache& cache)
+    {
+        this->light = cache.light;
+        this->shadowPassDepthTexIds = cache.shadowPassDepthTexIds;
+        this->bMultiMats = cache.bMultiMats;
+        for(Int i = 0; i < 6; i++)
+        {
+            this->lightMats[i] = cache.lightMats[i];
+        }
+    }
+    ShadowMapCache& operator=(const ShadowMapCache&) = delete;
+
+    glm::mat4 lightMats[6];
+    Light* light;
+    GLuint shadowPassDepthTexIds;
+    Bool bMultiMats;
+};
+
 class Scene
 {
     friend class ModelLoader;
@@ -62,10 +88,7 @@ public:
     GLuint basePassDepthStencilTexId;
 
     GLuint shadowPassFBO;
-    std::vector<GLuint> shadowPassDepthTexIds;
-
-    std::vector<glm::mat4> lightMats;
-    std::vector<glm::mat4>& GetLightMats() {return lightMats;}
+    std::vector<ShadowMapCache> shadowMapCaches;
 
     GPUTexture LTC1Tex;
     GPUTexture LTC2Tex;

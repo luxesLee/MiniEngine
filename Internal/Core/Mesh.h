@@ -90,7 +90,7 @@ public:
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
 
-        std::vector<std::tuple<void*, Int, Int>> vbosArray;
+        std::vector<std::tuple<void*, unsigned long long, size_t>> vbosArray;
         vbosArray.push_back(std::make_tuple((void*)vertices.data(), sizeof(glm::vec3), vertices.size()));
         if(normals.size() > 0)
         {

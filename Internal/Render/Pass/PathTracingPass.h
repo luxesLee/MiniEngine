@@ -14,4 +14,7 @@ public:
 
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
     void Init();
+
+private:
+    GLuint vao;
 };

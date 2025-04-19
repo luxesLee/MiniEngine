@@ -8,7 +8,6 @@
 #include "Core/Config.h"
 
 
-GLuint vao;
 PathTracingPass::PathTracingPass()
 {
     Init();
@@ -69,7 +68,7 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->pathTracingFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene->outputFBO);
     glReadBuffer(GL_COLOR_ATTACHMENT0);
-    glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, g_Config->screenWidth, g_Config->screenHeight, 0, 0, g_Config->screenWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 void PathTracingPass::Init()

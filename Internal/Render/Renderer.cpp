@@ -16,7 +16,7 @@ Renderer::Renderer()
         denoisePass = CreateDenoisePass();
     }
 
-    glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
+    glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
     glGenBuffers(1, &CommonUBO);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, CommonUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, CommonUBO);
@@ -96,7 +96,7 @@ void Renderer::Render(Scene *scene)
 
 void Renderer::Resize()
 {
-    glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
+    glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
 }
 
 void Renderer::UpdateUBO(Scene* scene)
@@ -149,29 +149,47 @@ void Renderer::ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard
 
 void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
+    // BasePass
     basePass.AddPass(fg, blackboard, scene);
 
-    if(g_Config->bShadeShadow)
+    aoRenderer.AddPass(fg, blackboard, scene);
+
+    // ShadowMap
+    if(g_Config->bShadeShadow || g_Config->bVXGI)
     {
         glViewport(0, 0, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
         shadowRenderer.AddPass(fg, blackboard, scene);
-        glViewport(g_Config->imguiWidth, 0, g_Config->wholeWidth, g_Config->screenHeight);
-
-        if(g_Config->bDebugShadowMap)
-        {
-            // glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
-            // AddPassVisualizeShadowMap({matTemp});
-        }
+        glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
     }
 
+    // Direct Lighting
     switch (g_Config->lightMode)
     {
     case LightMode::Deferred: deferredLightingPass.AddPass(fg, blackboard, scene); break;
     case LightMode::TiledDeferred: break;
     case LightMode::ClusterDeferred: break;
     }
-    
 
+    // Indirect Lighting
+    if(g_Config->bVXGI)
+    {
+        vxgiPass.AddPass(fg, blackboard, scene);
+    }
+
+    if(g_Config->bSSR)
+    {
+
+    }
+
+    // Post Process
+    postProcessPass.AddPass(fg, blackboard, scene);
+
+    // Debug
+    if(g_Config->bDebugShadowMap)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+        shadowRenderer.AddPassVisualizeShadowMap(scene);
+    }
 }
 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)

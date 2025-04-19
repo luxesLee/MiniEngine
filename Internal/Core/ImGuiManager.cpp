@@ -70,11 +70,11 @@ void ImGuiManager::RenderOpenDialog()
 
 void ImGuiManager::RenderSettingWindow()
 {
-    ImGui::SetNextWindowPos(ImVec2(0, 20));
+    ImGui::SetNextWindowPos(ImVec2(g_Config->screenWidth, 20));
     ImGui::SetNextWindowSize(ImVec2(g_Config->imguiWidth, g_Config->screenHeight - 20));
     if(ImGui::Begin("Setting", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
     {
-        if(ImGui::CollapsingHeader("Basic"))
+        if(ImGui::CollapsingHeader("Basic", ImGuiTreeNodeFlags_DefaultOpen))
         {
             // FPS
             ImGuiIO& io = ImGui::GetIO();
@@ -91,7 +91,7 @@ void ImGuiManager::RenderSettingWindow()
         }
 
         // render
-        if(ImGui::CollapsingHeader("Render"))
+        if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("Current rendering accum %d frames", g_Config->accumulateFrames);
             ImGui::Checkbox("Render BaseColor", &g_Config->bShadeBaseColor);
@@ -135,11 +135,21 @@ void ImGuiManager::RenderSettingWindow()
             }
 
             ImGui::SliderInt("PathTracing Depth", &g_Config->maxRayTracingDepth, 1.0f, 8.0f);
+        }
 
+        // shadow
+        if(ImGui::CollapsingHeader("Shadow", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("Render Shadow", &g_Config->bShadeShadow);
+            ImGui::Checkbox("Render PCF", &g_Config->bPCF);
+            ImGui::Checkbox("Use CascadeShadow", &g_Config->bCascadeShadow);
+            ImGui::Checkbox("Debug ShadowMap", &g_Config->bDebugShadowMap);
+            ImGui::SliderInt("Cascade Level", &g_Config->cascadeLevel, 1, 6);
+            ImGui::Text("ShadowMap Resolution:(%.2f x %.2f)", g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
         }
 
         // Camera
-        if(ImGui::CollapsingHeader("Camera"))
+        if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Text("Camera Position:(%.5f, %.5f, %.5f)", g_Camera->Position.x, g_Camera->Position.y, g_Camera->Position.z);
             ImGui::Text("Camera Front:(%.5f, %.5f, %.5f)", g_Camera->Front.x, g_Camera->Front.y, g_Camera->Front.z);

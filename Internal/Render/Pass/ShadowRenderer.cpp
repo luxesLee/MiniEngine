@@ -11,55 +11,24 @@ void ShadowRenderer::InitLightMatrix(Scene *scene)
 
 void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
-    Shader* shaderShadowDepth = g_ShaderManager.GetShader("ShadowDepth");
-    if(!shaderShadowDepth)
-    {
-        return;
-    }
+    Shader* shaderShadowDepth = nullptr;
+    auto meshBatch = scene->GetMeshBatches();
 
     glBindFramebuffer(GL_FRAMEBUFFER, scene->shadowPassFBO);
-
     glClearDepth(1.0);
     glDepthFunc(GL_LEQUAL);
     glCullFace(GL_FRONT);  // peter panning
 
-    auto lights = scene->GetSceneLights();
-    auto& lightMats = scene->GetLightMats();
-    lightMats.resize(lights.size());
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, scene->getTransformTexId());
 
-    shaderShadowDepth->use();
-
-    for(int i = 0; i < lights.size(); i++)
+    auto DrawMesh = [&](Shader* shader, const std::vector<MeshBatch*>& meshBatches)
     {
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, scene->shadowPassDepthTexIds[i], 0);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        lightMats[i] = GetLightMatrix(&lights[i], scene);
-        shaderShadowDepth->setMat4("lightTransform", lightMats[i]);
-
-        if(lights[i].type == LightType::DIRECTIONAL_LIGHT)
-        {
-            if(g_Config->bCascadeShadow)
-            {
-
-            }
-            else
-            {
-
-            }
-        }
-        else if(lights[i].type == LightType::POINT_LIGHT)
-        {
-
-        }
-
-
-        auto meshBatches = scene->GetMeshBatches();
         Int instanceBase = 0, curInstanceCount = 0;
         for(auto& meshBatch : meshBatches)
         {
             curInstanceCount = meshBatch->GetInstanceCount();
-            shaderShadowDepth->setInt("instanceBase", instanceBase);
+            shader->setInt("instanceBase", instanceBase);
             meshBatch->Bind();
             if(meshBatch->GetDrawElement())
             {
@@ -72,6 +41,64 @@ void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, S
             meshBatch->UnBind();
             instanceBase += curInstanceCount;
         }
+    };
+
+    for(Int i = 0; i < scene->shadowMapCaches.size(); i++)
+    {
+        ShadowMapCache* shadowMapCache = &scene->shadowMapCaches[i];
+        auto light = shadowMapCache->light;
+        // 仅支持一个定向光
+        if(!light || (light->type == DIRECTIONAL_LIGHT && i > 0))
+        {
+            continue;
+        }
+
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapCache->shadowPassDepthTexIds, 0);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        // todo:这里可以考虑对光源进行剔除，并限制更新频率
+        
+        if(light->type == LightType::DIRECTIONAL_LIGHT)
+        {
+            if(g_Config->bCascadeShadow)
+            {
+                auto& lightMats = GetCascadeLightMatrix(light);
+                memcpy_s(shadowMapCache->lightMats, 6 * sizeof(glm::mat4), lightMats.data(), 6 * sizeof(glm::mat4));
+                shaderShadowDepth = g_ShaderManager.GetShader("CascadeDirectionalShadowDepth");
+                shaderShadowDepth->use();
+                for(Int lightMatIndex = 0; lightMatIndex < g_Config->cascadeLevel; lightMatIndex++)
+                {
+                    shaderShadowDepth->setMat4("cascadeMat[" + std::to_string(lightMatIndex) + "]"
+                        , shadowMapCache->lightMats[lightMatIndex]);
+                }
+            }
+            else
+            {
+                shadowMapCache->lightMats[0] = GetDirectionalLightMatrix(light, scene);
+                shaderShadowDepth = g_ShaderManager.GetShader("DirectionalShadowDepth");
+                shaderShadowDepth->use();
+                shaderShadowDepth->setMat4("lightTransform", shadowMapCache->lightMats[0]);
+            }
+        }
+        else if(light->type == LightType::POINT_LIGHT)
+        {
+            auto lightMats = GetPointLightMatrix(light);
+            memcpy_s(shadowMapCache->lightMats, 6 * sizeof(glm::mat4), lightMats.data(), 6 * sizeof(glm::mat4));
+            shaderShadowDepth = g_ShaderManager.GetShader("PointShadowDepth");
+            shaderShadowDepth->use();
+            for(Int lightMatIndex = 0; lightMatIndex < 6; lightMatIndex++)
+            {
+                shaderShadowDepth->setMat4("pointLightMat[" + std::to_string(lightMatIndex) + "]", shadowMapCache->lightMats[lightMatIndex]);
+            }
+            shaderShadowDepth->setVec3("lightPos", light->position);
+        }
+        else
+        {
+        }
+
+        DrawMesh(shaderShadowDepth, meshBatch);
     }
 }
 
@@ -96,7 +123,7 @@ std::vector<glm::vec4> GetFrustumPoints(const glm::mat4& projViewMat)
     return frustumCorners;
 }
 
-void ShadowRenderer::AddPassVisualizeShadowMap(const std::vector<glm::mat4>& lightMatrices)
+void ShadowRenderer::AddPassVisualizeShadowMap(Scene* scene)
 {
     std::vector<GLuint> visualizerVAOs;
     std::vector<GLuint> visualizerVBOs;
@@ -127,7 +154,30 @@ void ShadowRenderer::AddPassVisualizeShadowMap(const std::vector<glm::mat4>& lig
     visualizerEBOs.resize(8);
     visualizerVBOs.resize(8);
 
-    for (int i = 0; i < lightMatrices.size(); ++i)
+    std::vector<glm::mat4> lightMatrices;
+    for(Int i = 0; i < scene->shadowMapCaches.size(); i++)
+    {
+        auto& shadowMapCache = scene->shadowMapCaches[i];
+        auto light = shadowMapCache.light;
+        if(!light || (light->type == DIRECTIONAL_LIGHT && i > 0))
+        {
+            continue;
+        }
+
+        if((light->type == LightType::DIRECTIONAL_LIGHT && g_Config->bCascadeShadow) || light->type == LightType::POINT_LIGHT)
+        {
+            for(Int j = 0; j < g_Config->cascadeLevel; j++)
+            {
+                lightMatrices.push_back(shadowMapCache.lightMats[j]);
+            }
+        }
+        else
+        {
+            lightMatrices.push_back(shadowMapCache.lightMats[0]);
+        }
+    }
+
+    for (int i = 0; i < lightMatrices.size() && i < 8; ++i)
     {
         const auto corners = GetFrustumPoints(lightMatrices[i]);
         std::vector<glm::vec3> vec3s;
@@ -171,23 +221,7 @@ void ShadowRenderer::AddPassVisualizeShadowMap(const std::vector<glm::mat4>& lig
     visualizerVBOs.clear();
 }
 
-const glm::mat4 &ShadowRenderer::GetLightMatrix(Light *light, Scene* scene)
-{
-    if(light->type == LightType::DIRECTIONAL_LIGHT)
-    {
-        return GetDirectionalLightMatrix(light, scene);
-    }
-    else if(light->type == LightType::POINT_LIGHT)
-    {
-        // return GetPointLightMatrix(light);
-    }
-    else if(light->type == LightType::SPOT_LIGHT)
-    {
-        return GetSpotLightMatrix(light);
-    }
-}
-
-const glm::mat4 &ShadowRenderer::GetDirectionalLightMatrix(Light *light, Scene* scene)
+glm::mat4 &ShadowRenderer::GetDirectionalLightMatrix(Light *light, Scene* scene)
 {
     // 这里直接使用已加载的场景包围盒
     // 可以使整个场景都出现在阴影图上
@@ -203,38 +237,38 @@ const glm::mat4 &ShadowRenderer::GetDirectionalLightMatrix(Light *light, Scene* 
     return P * V;
 }
 
-const std::vector<glm::mat4>& ShadowRenderer::GetPointLightMatrix(Light *light)
+std::vector<glm::mat4> ShadowRenderer::GetPointLightMatrix(Light *light)
 {
     std::vector<glm::mat4> pointsMat(6);
     glm::vec3 position = light->position, target, up;
-    glm::mat4 P = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, light->range), V;
+    glm::mat4 P = glm::perspective(glm::radians(90.0f), g_Config->shadowDepthWidth * 1.0f / g_Config->shadowDepthHeight, 0.001f, 5.0f), V;
     for(Int i = 0; i < 6; i++)
     {
         switch (i)
         {
         case 0:
             target = position + glm::vec3(1, 0, 0);
-            up = glm::vec3(0, 1, 0);
+            up = glm::vec3(0, -1, 0);
             break;
         case 1:
             target = position + glm::vec3(-1, 0, 0);
-            up = glm::vec3(0, 1, 0);
+            up = glm::vec3(0, -1, 0);
             break;
         case 2:
             target = position + glm::vec3(0, 1, 0);
-            up = glm::vec3(0, 0, -1);
+            up = glm::vec3(0, 0, 1);
             break;
         case 3:
             target = position + glm::vec3(0, -1, 0);
-            up = glm::vec3(0, 0, 1);
+            up = glm::vec3(0, 0, -1);
             break;
         case 4:
             target = position + glm::vec3(0, 0, 1);
-            up = glm::vec3(0, 1, 0);
+            up = glm::vec3(0, -1, 0);
             break;
         case 5:
             target = position + glm::vec3(0, 0, -1);
-            up = glm::vec3(0, 1, 0);
+            up = glm::vec3(0, -1, 0);
             break;
         default:
             break;
@@ -246,17 +280,17 @@ const std::vector<glm::mat4>& ShadowRenderer::GetPointLightMatrix(Light *light)
     return pointsMat;
 }
 
-const glm::mat4 &ShadowRenderer::GetSpotLightMatrix(Light *light)
+glm::mat4 &ShadowRenderer::GetSpotLightMatrix(Light *light)
 {
     return glm::mat4(1.0f);
 }
 
-const glm::mat4 &ShadowRenderer::GetQuadLightMatrix(Light *light)
+glm::mat4 &ShadowRenderer::GetQuadLightMatrix(Light *light)
 {
     return glm::mat4(1.0f);
 }
 
-const std::vector<glm::mat4> &ShadowRenderer::GetCascadeLightMatrix(Light *light)
+std::vector<glm::mat4> ShadowRenderer::GetCascadeLightMatrix(Light *light)
 {
     std::vector<glm::mat4> ret(g_Config->cascadeLevel);
     std::vector<std::pair<Float, Float>> cascadePlane = {

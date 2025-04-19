@@ -1,7 +1,9 @@
 #pragma once
 #include "Pass/GBufferPass.h"
+#include "Pass/AmbientOcclusionRenderer.h"
 #include "Pass/ShadowRenderer.h"
 #include "Pass/DeferredLightingPass.h"
+#include "Pass/VXGIPass.h"
 #include "Pass/PostProcessPass.h"
 #include "Pass/PathTracingPass.h"
 #include "Pass/ToneMappingPass.h"
@@ -38,14 +40,16 @@ private:
 
 
 private:
-    GBufferPass             basePass;
-    ShadowRenderer          shadowRenderer;
-    DeferredLightingPass    deferredLightingPass;
-    PostProcessPass         postProcessPass;
+    GBufferPass                 basePass;
+    AmbientOcclusionRenderer    aoRenderer;
+    ShadowRenderer              shadowRenderer;
+    DeferredLightingPass        deferredLightingPass;
+    VXGIPass                    vxgiPass;
+    PostProcessPass             postProcessPass;
 
-    PathTracingPass         pathTracingPass;
-    ToneMappingPass         toneMappingPass;
-    IDenoisePass*           denoisePass = nullptr;
+    PathTracingPass             pathTracingPass;
+    ToneMappingPass             toneMappingPass;
+    IDenoisePass*               denoisePass = nullptr;
 
     GLuint CommonUBO;
     GLuint PathTracingUBO;

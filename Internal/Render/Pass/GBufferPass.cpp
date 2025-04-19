@@ -58,7 +58,7 @@ void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scen
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->deferredBasePassFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene->outputFBO);
-    glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, g_Config->screenWidth, g_Config->screenHeight, 0, 0, g_Config->screenWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 void GBufferPass::AddPreDepthPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
