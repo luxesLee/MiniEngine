@@ -44,10 +44,25 @@ void PresentWindow::InitWindow(uint16_t width, uint16_t height, std::string titl
     glfwSetMouseButtonCallback(window, mousebutton_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwMakeContextCurrent(window);
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+    if (gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+    {
+        if(GLAD_GL_ARB_shading_language_include)
+        {
+            std::cout << "GL_ARB_shading_language_include is supported!" << std::endl;
+        }
+        if(GLAD_GL_ARB_shader_image_load_store)
+        {
+            std::cout << "GLAD_GL_ARB_shader_image_load_store is supported!" << std::endl;
+        }
+
+        const char* version = (const char*)glGetString(GL_VERSION);
+        std::cout << "Current OpenGL version: " << version << std::endl;
+    }
+    else
     {
         std::cout << "glad failed" << std::endl;
     }
+
     glfwSwapInterval(0);
 }
 

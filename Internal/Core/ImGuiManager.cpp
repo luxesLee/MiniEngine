@@ -143,10 +143,63 @@ void ImGuiManager::RenderSettingWindow()
             ImGui::Checkbox("Render Shadow", &g_Config->bShadeShadow);
             ImGui::Checkbox("Render PCF", &g_Config->bPCF);
             ImGui::Checkbox("Use CascadeShadow", &g_Config->bCascadeShadow);
-            ImGui::Checkbox("Debug ShadowMap", &g_Config->bDebugShadowMap);
             ImGui::SliderInt("Cascade Level", &g_Config->cascadeLevel, 1, 6);
-            ImGui::Text("ShadowMap Resolution:(%.2f x %.2f)", g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
+            ImGui::Text("ShadowMap Resolution:(%d x %d)", g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
         }
+
+        // Indirect Lighting
+        if(ImGui::CollapsingHeader("Indirect Lighting", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("SSAO", &g_Config->bSSAO);
+            ImGui::SliderInt("SSAO Kernel Size", &g_Config->SSAOKernelSize, 0, 64);
+            ImGui::SliderFloat("SSAO Radius", &g_Config->SSAORadius, 0.05f, 1.0f);
+            ImGui::SliderFloat("SSAO Bias", &g_Config->SSAOBias, 0.01f, 0.1f);
+
+            ImGui::Checkbox("VXGI", &g_Config->bVXGI);
+            if(ImGui::RadioButton("Voxel Size: 16", &g_Config->VoxelSize, 16))
+            {
+                g_Config->VoxelMipmapLvel = 1;
+            }
+            if(ImGui::RadioButton("Voxel Size: 64", &g_Config->VoxelSize, 64))
+            {
+                g_Config->VoxelMipmapLvel = 3;
+            }
+            if(ImGui::RadioButton("Voxel Size: 256", &g_Config->VoxelSize, 256))
+            {
+                g_Config->VoxelMipmapLvel = 6;
+            }
+        }
+
+        // Debug
+        auto highestBitPosition = [](unsigned int x)
+        {
+            if(x == 0) return -1;
+            int pos = 0;
+            while(x != 0)
+            {
+                x >>= 1;
+                pos++;
+            }
+            return pos - 1;
+        };
+        const char* DebugModes[] = {"None", "Shadow", "VXGI"};
+        if(ImGui::BeginCombo("Current DebugMode :", DebugModes[highestBitPosition(g_Config->debugMode)]))
+        {
+            for(int i = 0; i < 3; i++)
+            {
+                bool isSelected = (g_Config->debugMode == (1 << i));
+                if(ImGui::Selectable(DebugModes[i], isSelected))
+                {
+                    g_Config->debugMode = DebugMode(1 << i);
+                }
+                if(isSelected)
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
 
         // Camera
         if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))

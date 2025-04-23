@@ -26,7 +26,7 @@ void Scene::BuildScene()
         createBLAS();
         createTLAS();
     }
-
+    BuildEnvMap();
     UploadDataToGpu();
 }
 
@@ -61,7 +61,7 @@ void Scene::CleanScene()
         }
     }
     textureMapsArray.resize(0);
-    envMap.reset();
+    envMap = std::make_shared<EnvMap>();
     sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
 
     for(int i = 0; i < meshBatches.size(); i++)
@@ -248,6 +248,24 @@ void Scene::prepareTexture()
     }
 }
 
+void Scene::BuildEnvMap()
+{
+    if(envMap->envTextures.size() == 0)
+    {
+        return;
+    }
+
+    if(envMap->bCubeMap)
+    {
+        envTex = RenderResHelper::generateCubeEnvMap(envMap->envTextures);
+        irradianceEnvTex = RenderResHelper::generateIrradianceMap(envTex);
+    }
+    else
+    {
+
+    }
+}
+
 // 暂时这样写，后续用rendergraph
 void Scene::InitFBO()
 {
@@ -304,29 +322,29 @@ void Scene::InitFBO()
         glGenTextures(1, &GBufferTexId[0]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GBufferTexId[0], 0);
 
         glGenTextures(1, &GBufferTexId[1]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[1]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, GBufferTexId[1], 0);
 
         glGenTextures(1, &GBufferTexId[2]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[2]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, GBufferTexId[2], 0);
 
         glGenTextures(1, &GBufferTexId[3]);
         glBindTexture(GL_TEXTURE_2D, GBufferTexId[3]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, GBufferTexId[3], 0);
 
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -346,7 +364,7 @@ void Scene::InitFBO()
 
 // ----------------------------------------------------------------------------
 
-    if(g_Config->curToneMapping != ToneMappingType::None)
+    if(g_Config->curToneMapping != ToneMappingType::NONEToneMapping)
     {
         glGenFramebuffers(1, &toneMappingFBO);
         glBindFramebuffer(GL_FRAMEBUFFER, toneMappingFBO);
@@ -604,7 +622,9 @@ void Scene::DeleteGPUData()
         RenderResHelper::destroyGPUTexture(matTex);
         RenderResHelper::destroyGPUTexture(instanceTransformTex);
         RenderResHelper::destroyGPUTexture(bvhTex);
-        RenderResHelper::destroyGPUTexture(envTex);
         RenderResHelper::destroyGPUTexture(textureArrayTex);
     }
+
+    RenderResHelper::destroyGPUTexture(envTex);
+    RenderResHelper::destroyGPUTexture(irradianceEnvTex);
 }

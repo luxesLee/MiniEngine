@@ -15,7 +15,7 @@ enum LightMode
 
 enum DenoiseType
 {
-    NONE,
+    NONEDenoise,
     SVGF,
     ODIN,
     OPTIX,
@@ -23,10 +23,17 @@ enum DenoiseType
 
 enum ToneMappingType
 {
-    None,
+    NONEToneMapping,
     Linear,
     ACES,
     TonyMcMapface
+};
+
+enum DebugMode
+{
+    NONEDebug = 1,
+    DebugShadow = (1 << 1),
+    DebugVXGI = (1 << 2),
 };
 
 class Config
@@ -46,6 +53,7 @@ public:
     std::string title = "MiniEngine";
 
     // sceneConfigPath
+    // std::string configPath = "../../Resource/newsponza.json";
     std::string configPath = "../../Resource/Cornell_box_Point_Light.json";
 
     // camera
@@ -58,7 +66,7 @@ public:
     LightMode lightMode = LightMode::Deferred;
     Int32 maxRayTracingDepth = 2;
     Uint32 accumulateFrames = 0;
-    DenoiseType curDenoise = DenoiseType::NONE;
+    DenoiseType curDenoise = DenoiseType::NONEDenoise;
     ToneMappingType curToneMapping = ToneMappingType::Linear;
     Uint32 texWidth = 512, texHeight = 512;
 
@@ -67,20 +75,26 @@ public:
     // shadow
     Bool bShadeShadow = true;
     Bool bPCF = true;
-    Bool bCascadeShadow = false;
-    Bool bDebugShadowMap = false;
     Int cascadeLevel = 4;
+    Bool bCascadeShadow = false;
     Uint32 shadowDepthWidth = 1024, shadowDepthHeight = 1024;
 
     // Indirect Lighting
-    Bool bSSAO = true;
-    Int SSAOKernelSize = 32;
+    Bool bSSAO = false;
+    Int SSAOKernelSize = 64;
+    Float SSAORadius = 0.5f;
+    Float SSAOBias = 0.025f;
 
     Bool bDDGI = false;
+
     Bool bVXGI = true;
+    Int VoxelSize = 256;
+    Int VoxelMipmapLvel = 6;
+    
     Bool bSSR = true;
 
     // Debug
+    DebugMode debugMode = NONEDebug;
 
     // action
     Bool bRenderdocCapture = false;

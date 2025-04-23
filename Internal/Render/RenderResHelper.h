@@ -1,7 +1,8 @@
 #pragma once
 #include <glad/glad.h>
-#include <cstdint>
 #include <iostream>
+#include "Core/Texture.h"
+#include "Util/Types.h"
 
 enum TextureType
 {
@@ -58,6 +59,7 @@ public:
     static void deleteFBO();
     static GPUTexture generateGPUTexture(TextureInfo& textureInfo);
     static void destroyGPUTexture(GPUTexture& textureInfo);
-
+    static GPUTexture generateCubeEnvMap(const std::vector<Texture>& envMap);
+    static GPUTexture generateIrradianceMap(const GPUTexture& gpuTex);
 };
 

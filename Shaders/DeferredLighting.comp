@@ -12,11 +12,12 @@ layout(binding = 4) uniform sampler2D DepthTex;
 layout(binding = 5) uniform samplerBuffer lightTex;
 layout(binding = 6) uniform sampler2D LTC1; // 逆变换矩阵
 layout(binding = 7) uniform sampler2D LTC2; // GGX预积分，菲涅尔项，0，几何衰减
+layout(binding = 8) uniform samplerCube irradianceMap;
 
-layout(binding = 8) uniform sampler2D directionalMap;
-layout(binding = 9) uniform sampler2DArray cascadeShadowMap;
-layout(binding = 10) uniform samplerCube pointShadowMap[2];
-layout(binding = 12) uniform sampler2D otherShadowMap[2];
+layout(binding = 9) uniform sampler2D directionalMap;
+layout(binding = 10) uniform sampler2DArray cascadeShadowMap;
+layout(binding = 11) uniform samplerCube pointShadowMap[2];
+layout(binding = 13) uniform sampler2D otherShadowMap[2];
 
 layout(binding = 0) uniform CommonUBO
 {
@@ -454,17 +455,21 @@ void main()
     vec4 param3 = texelFetch(GBuffer3, uv, 0);
     float depth = texelFetch(DepthTex, uv, 0).r;
 
-    vec3 worldPosition = param0.xyz;
+    vec3 ViewPosition = param0.xyz;
     float ssaoFactor = param0.w;
-    vec3 worldNormal = param1.xyz;
+    vec3 ViewNormal = param1.xyz;
     float metallic = param2.x;
     float specular = param2.y;
     float roughness = param2.z;
     vec3 baseColor = param3.rgb;
     vec3 emission = vec3(param1.a, param2.a, param3.a);
 
+    vec3 worldPosition = (inverse(view) * vec4(ViewPosition, 1.0f)).xyz;
+    vec3 worldNormal = transpose(mat3(view)) * ViewNormal;
+
     Brdf brdf = GetBrdfData(baseColor, specular, metallic, roughness);
     vec3 viewDirection = worldPosition - cameraPosition.xyz;
+    vec3 reflectedDir = reflect(-viewDirection, worldNormal);
 
     // 直接光照
     vec3 directLighting = vec3(0.0);
@@ -500,7 +505,8 @@ void main()
     }
 
     // 处理AO
-    
+    // directLighting += texture(irradianceMap, reflectedDir).rgb * brdf.diffuseAlbedo * ssaoFactor;
+    // directLighting += vec3(0.5, 0.5, 0.5) * brdf.diffuseAlbedo * (ssaoFactor > 0 ? ssaoFactor : 1.0f);
 
     // 自发光
     directLighting += emission;

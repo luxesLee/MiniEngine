@@ -101,6 +101,8 @@ void SSAOPass::AddSSAOPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sce
 
     shaderSSAO->use();
     shaderSSAO->setInt("ssaoKernel", g_Config->SSAOKernelSize);
+    shaderSSAO->setFloat("ssaoRadius", g_Config->SSAORadius);
+    shaderSSAO->setFloat("ssaoBias", g_Config->SSAOBias);
     for(Int i = 0; i < g_Config->SSAOKernelSize; i++)
     {
         shaderSSAO->setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);

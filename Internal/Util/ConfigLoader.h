@@ -5,6 +5,7 @@
 #include "vec3.hpp"
 #include "mat4x4.hpp"
 #include "Core/Material.h"
+#include "Util/Types.h"
 
 struct ModelConfig
 {
@@ -15,7 +16,8 @@ struct ModelConfig
 
 struct EnvMapConfig
 {
-    std::string envMapPath;
+    std::vector<std::string> envMapPaths;
+    Bool bCubeMap;
 };
 
 enum LightType

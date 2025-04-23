@@ -48,6 +48,16 @@ struct ShadowMapCache
     Bool bMultiMats;
 };
 
+struct EnvMap
+{
+    EnvMap()
+    {
+        bCubeMap = false;
+    }
+    std::vector<Texture> envTextures;
+    Bool bCubeMap;
+};
+
 class Scene
 {
     friend class ModelLoader;
@@ -56,6 +66,7 @@ public:
     Scene() 
     {
         sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
+        envMap = std::make_shared<EnvMap>();
         curOutputTex = 1;
     }
     ~Scene()
@@ -151,7 +162,9 @@ private:
     std::vector<mat4> transforms;
     std::vector<Texture*> textures;
     std::vector<Uchar> textureMapsArray;
-    std::shared_ptr<Texture> envMap;
+
+    void BuildEnvMap();
+    std::shared_ptr<EnvMap> envMap;
 
 public:
     GLuint getVertTexId() const {return verticeTex.texId;}
@@ -164,6 +177,7 @@ public:
     GLuint getEnvTexId() const {return envTex.texId;}
     GLuint getTransformTexId() const {return instanceTransformTex.texId;}
     GLuint getTextureArrayId() const {return textureArrayTex.texId;}
+    GLuint getIrradianceEnvTexId() const {return irradianceEnvTex.texId;}
 
 private:
     GPUTexture verticeTex;
@@ -176,4 +190,5 @@ private:
     GPUTexture bvhTex;
     GPUTexture envTex;
     GPUTexture textureArrayTex;
+    GPUTexture irradianceEnvTex;
 };

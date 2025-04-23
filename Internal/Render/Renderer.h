@@ -25,6 +25,7 @@ public:
         {
             delete denoisePass;
         }
+        glDeleteBuffers(1, &defaultVAO);
     }
 
     void Update(Scene* scene);
@@ -33,11 +34,16 @@ public:
 
 private:
     void UpdateUBO(Scene* scene);
+    
     void DoCulling();
-    void ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    void DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    void PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 
+    void ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    
+    void DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    
+    void DebugRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+
+    void PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 
 private:
     GBufferPass                 basePass;
@@ -53,4 +59,6 @@ private:
 
     GLuint CommonUBO;
     GLuint PathTracingUBO;
+
+    GLuint defaultVAO;
 };

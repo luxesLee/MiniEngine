@@ -13,7 +13,7 @@ void ParseConfig(const std::string &configFile, SceneConfig &config)
     json cameraJson = params.value("camera", json::object());
     json modelJsons = params.value("models", json::array());
     json lightJsons = params.value("lights", json::array());
-    json envMapJson = params.value("envMap", json::object());
+    json envMapJsons = params.value("envMap", json::array());
     json matsJson = params.value("materials", json::array());
 
     auto getValue = [&](const json jsonMap, const std::string& key, std::vector<float>& output)
@@ -136,9 +136,14 @@ void ParseConfig(const std::string &configFile, SceneConfig &config)
         config.lightConfigs.push_back(lightconfig);
     }
 
-    if(envMapJson.contains("envMap"))
+    if(envMapJsons.size() > 0)
     {
-        config.envMapConfig.envMapPath = envMapJson["envMap"];
+        config.envMapConfig.bCubeMap = envMapJsons.value("cubeMap", 0);
+        json envMapPathJsons = envMapJsons.value("path", json::array());
+        for(const auto& envMapPath : envMapPathJsons.items())
+        {
+            config.envMapConfig.envMapPaths.push_back(envMapPath.value());
+        }
     }
 
     for(const auto& matJson : matsJson.items())

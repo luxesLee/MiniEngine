@@ -235,6 +235,10 @@ glm::mat4 &ShadowRenderer::GetDirectionalLightMatrix(Light *light, Scene* scene)
                     extent.pmin.z, 1.1f * extent.pmax.z);
 
     return P * V;
+
+    // glm::mat4 P = glm::ortho(sceneBox.pmin.x, sceneBox.pmax.x, sceneBox.pmin.y, sceneBox.pmax.y, 
+    //                 sceneBox.pmin.z, 1.1f * sceneBox.pmax.z);
+    // return P;
 }
 
 std::vector<glm::mat4> ShadowRenderer::GetPointLightMatrix(Light *light)

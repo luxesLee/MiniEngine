@@ -19,6 +19,7 @@ public:
     }
 
     void loadEnvMap(Scene* scene, const std::string& filePath);
+    void loadEnvMap(Scene* scene, const std::vector<std::string>& filePaths);
     entt::entity loadModel(Scene *scene, const ModelConfig& modelConfig, const MaterialConfigMap& matConfigMap);
 
 private:

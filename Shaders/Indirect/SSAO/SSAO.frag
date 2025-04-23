@@ -20,38 +20,35 @@ layout(binding = 0) uniform CommonUBO
 };
 
 uniform int ssaoKernel;
+uniform float ssaoRadius;
+uniform float ssaoBias;
 uniform vec3 samples[64];
-
-float radius = 0.5;
-float bias = 0.0025;
 
 void main() 
 {
-    vec2 texCoord = vec2(gl_FragCoord.x / screenAndInvScreen.x, gl_FragCoord.y / screenAndInvScreen.y);
-    vec3 WorldPosition = texture(GBuffer0, texCoord).xyz;
-    vec3 Normal = normalize(texture(GBuffer1, texCoord).xyz);
-    // 引入随机旋转向量
+    vec2 texCoord = (gl_FragCoord.xy) / screenAndInvScreen.xy;
     vec2 NoiseScale = vec2(screenAndInvScreen.xy / 4.0f);
-    vec3 randomVec = normalize(texture(NoiseTex, texCoord * NoiseScale).xyz);
-    vec3 tangent = normalize(randomVec - Normal * dot(randomVec, Normal));
-    vec3 bitangent = cross(Normal, tangent);
-    mat3 TBN = mat3(tangent, bitangent, Normal);
 
+    vec3 ViewPosition = texture(GBuffer0, texCoord).xyz;
+    vec3 ViewNormal = normalize(texture(GBuffer1, texCoord).xyz);
+    vec3 randomVec = normalize(texture(NoiseTex, texCoord * NoiseScale).xyz);
+    vec3 tangent = normalize(randomVec - ViewNormal * dot(randomVec, ViewNormal));
+    vec3 bitangent = cross(ViewNormal, tangent);
+    mat3 TBN = mat3(tangent, bitangent, ViewNormal);
+    
     float factor = 0.0f;
     for(int i = 0; i < ssaoKernel; i++)
     {
-        // 由切线空间到世界空间
-        vec3 samplePos = WorldPosition + TBN * samples[i] * radius;
+        vec3 samplePos = ViewPosition + TBN * samples[i] * ssaoRadius;
 
-        // 世界空间到屏幕空间
-        vec4 offset = projectionView * vec4(samplePos, 1.0f);
+        vec4 offset = projection * vec4(samplePos, 1.0f);
         offset.xyz /= offset.w;
-        offset.xyz = offset.xyz * 0.5 + 0.5;
+        offset.xyz = offset.xyz * 0.5 + 0.5f;
 
         float sampleDepth = texture(GBuffer0, offset.xy).z;
-        // 过滤掉物体边缘：当前着色点与周围采样点的深度差异越大，rangeCheck越接近0
-        float rangeCheck = smoothstep(0.0f, 1.0f, radius / abs(WorldPosition.z - sampleDepth));
-        factor += (sampleDepth <= samplePos.z + bias ? 1.0 : 0.0);
+
+        float rangeCheck = smoothstep(0.0, 1.0, ssaoRadius / abs(ViewPosition.z - sampleDepth));
+        factor += (sampleDepth >= ViewPosition.z + ssaoBias ? 1.0 : 0.0) * rangeCheck;
     }
     factor = 1.0 - factor / ssaoKernel;
     ssaoFactor = factor;

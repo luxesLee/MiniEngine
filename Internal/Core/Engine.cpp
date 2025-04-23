@@ -53,9 +53,9 @@ void Engine::UpdateScene(const SceneConfig& config)
         scene->AppendLight(Light(light));
     }
 
-    if(config.envMapConfig.envMapPath.size() > 0)
+    if(config.envMapConfig.bCubeMap)
     {
-        modelLoader->loadEnvMap(scene.get(), config.envMapConfig.envMapPath);
+        modelLoader->loadEnvMap(scene.get(), config.envMapConfig.envMapPaths);
     }
 
     scene->BuildScene();

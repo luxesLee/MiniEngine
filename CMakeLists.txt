@@ -68,8 +68,8 @@ include_directories(
 add_executable(${TARGET_NAME} 
     main.cpp
     ${SRC}
-    ${IMGUI_SRC}
     ${GLAD_SRC}
+    ${IMGUI_SRC}
     ${TINYGLTF_SRC}
     ${TINYOBJ_SRC}
     ${FRAMEGRAPH_SRC}
@@ -84,7 +84,7 @@ target_link_libraries(${TARGET_NAME}
     ${GLFW3_LIB}
     ${OPENGL_LIBRARIES}
     ${OIDN_LIBRARIES}
-    )
+)
 
 # output dir
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)

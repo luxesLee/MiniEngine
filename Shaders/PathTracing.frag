@@ -378,7 +378,6 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
             vec4 r4 = texelFetch(transformTex, ivec2((-leaf - 1) * 4 + 3, 0), 0);
             transform = mat4(r1, r2, r3, r4);
 
-            // It is more efficient to turn rays into world space than vertices 
             mat4 invTransform = inverse(transform);
             rayMS.origin = vec3(invTransform * vec4(ray.origin, 1.0f));
             rayMS.direction = vec3(invTransform * vec4(ray.direction, 0.0f));
@@ -423,12 +422,10 @@ bool TraceRay(Ray ray, out HitInfo hitInfo)
             }
         }
         
-        // only no hit with AS or after find BLAS will enter
         index = stack[--ptr];
 
         if(bEnterBLAS && index == -1)
         {
-            // backTrack from stack and restore the ray
             bEnterBLAS = false;
             index = stack[--ptr];
             rayMS.origin = ray.origin;

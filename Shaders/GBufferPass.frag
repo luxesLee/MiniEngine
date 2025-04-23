@@ -1,12 +1,12 @@
 #version 430 core
 
-layout(location = 0) in vec3 WorldPosition;
-layout(location = 1) in vec3 WorldNormal;
+layout(location = 0) in vec3 ViewPosition;
+layout(location = 1) in vec3 ViewNormal;
 layout(location = 2) in vec2 TexCoord;
 layout(location = 3) flat in int MatID;
 
-// GBuffer0 WorldPos(RGB8)|AO(A8)
-// GBuffer1 Normal(RGB8)|Emission.r(A8)
+// GBuffer0 ViewPos(RGB8)|AO(A8)
+// GBuffer1 ViewNormal(RGB8)|Emission.r(A8)
 // GBuffer2 Metallic(R8)|Specular(R8)|Roughness(R8)|Emission.g(A8)
 // GBuffer3 BaseColor(RGB8)|Emission.b(A8)
 layout(location = 0) out vec4 GBuffer0;
@@ -16,6 +16,19 @@ layout(location = 3) out vec4 GBuffer3;
 
 layout(binding = 1) uniform sampler2D matTex;
 layout(binding = 2)uniform sampler2DArray textureMapsArrayTex;
+
+layout(binding = 0) uniform CommonUBO
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 projectionView;
+    mat4 invProjection;
+    mat4 invViewProjection;
+    vec4 screenAndInvScreen;
+    vec4 cameraPosition;
+    int lightNum;
+};
 
 struct Medium
 {
@@ -137,8 +150,8 @@ Material GetMatrixData(int matID, vec2 uv)
 
 void main()
 {
-    GBuffer0.rgb = WorldPosition;
-    GBuffer1.rgb = WorldNormal;
+    GBuffer0.rgb = ViewPosition;
+    GBuffer1.rgb = ViewNormal;
     Material mat = GetMatrixData(MatID, TexCoord);
     GBuffer2.rgb = vec3(mat.metallic, mat.specularTint, mat.roughness);
     GBuffer3.rgb = mat.baseColor;

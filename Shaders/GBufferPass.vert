@@ -5,8 +5,8 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 uv;
 layout(location = 3) in float matID;    // 这里用int有错误
 
-layout(location = 0) out vec3 WorldPosition;
-layout(location = 1) out vec3 WorldNormal;
+layout(location = 0) out vec3 ViewPosition;
+layout(location = 1) out vec3 ViewNormal;
 layout(location = 2) out vec2 TexCoord;
 layout(location = 3) flat out int MatID;
 
@@ -37,8 +37,8 @@ void main()
 
     vec4 worldPos = instanceModelMat * vec4(vertex, 1.0f);
     gl_Position = projectionView * worldPos;
-    WorldPosition = worldPos.xyz;
-    WorldNormal = normalize(transpose(inverse(mat3(instanceModelMat))) * normal);
+    ViewPosition = (view * worldPos).xyz;
+    ViewNormal = normalize(transpose(inverse(mat3(view * instanceModelMat))) * normal);
     TexCoord = uv;
     MatID = floatBitsToInt(matID);
 }

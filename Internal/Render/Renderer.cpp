@@ -25,6 +25,9 @@ Renderer::Renderer()
     glBindBufferBase(GL_UNIFORM_BUFFER, 1, PathTracingUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
     glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(int), NULL, GL_DYNAMIC_DRAW);
+
+    glGenVertexArrays(1, &defaultVAO);
+    glBindVertexArray(defaultVAO);
 }
 
 void Renderer::Update(Scene* scene)
@@ -38,7 +41,7 @@ void Renderer::Update(Scene* scene)
         delete denoisePass;
         denoisePass = CreateDenoisePass();
     }
-    else if(!denoisePass && g_Config->curDenoise != DenoiseType::NONE)
+    else if(!denoisePass && g_Config->curDenoise != DenoiseType::NONEDenoise)
     {
         denoisePass = CreateDenoisePass();
     }
@@ -152,13 +155,24 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     // BasePass
     basePass.AddPass(fg, blackboard, scene);
 
-    aoRenderer.AddPass(fg, blackboard, scene);
+    if(g_Config->bSSAO)
+    {
+        aoRenderer.AddPass(fg, blackboard, scene);
+    }
 
     // ShadowMap
     if(g_Config->bShadeShadow || g_Config->bVXGI)
     {
         glViewport(0, 0, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight);
         shadowRenderer.AddPass(fg, blackboard, scene);
+        glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
+    }
+
+    // VXGI
+    if(g_Config->bVXGI)
+    {
+        glViewport(0, 0, g_Config->VoxelSize, g_Config->VoxelSize);
+        vxgiPass.AddBuildPass(fg, blackboard, scene);
         glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
     }
 
@@ -170,12 +184,6 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     case LightMode::ClusterDeferred: break;
     }
 
-    // Indirect Lighting
-    if(g_Config->bVXGI)
-    {
-        vxgiPass.AddPass(fg, blackboard, scene);
-    }
-
     if(g_Config->bSSR)
     {
 
@@ -185,11 +193,28 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     postProcessPass.AddPass(fg, blackboard, scene);
 
     // Debug
-    if(g_Config->bDebugShadowMap)
+    if(g_Config->debugMode != NONEDebug)
     {
+        DebugRendering(fg, blackboard, scene);
+    }
+}
+
+void Renderer::DebugRendering(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    switch (g_Config->debugMode)
+    {
+    case DebugShadow:
         glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
         shadowRenderer.AddPassVisualizeShadowMap(scene);
+        break;
+    case DebugVXGI:
+        glBindVertexArray(defaultVAO);
+        vxgiPass.AddDebugPass(fg, blackboard, scene);
+    default:
+        break;
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)

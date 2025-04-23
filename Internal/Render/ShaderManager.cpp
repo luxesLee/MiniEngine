@@ -3,7 +3,7 @@
 
 void ShaderManager::InitShader()
 {
-    shaderMap["TestShader"] = new Shader("Shaders/TestShader.vert", "Shaders/TestShader.frag");
+    // PathTracing
     shaderMap["PathTracing"] = new Shader("Shaders/PostProcess.vert", "Shaders/PathTracing.frag");
 
     // Deferred Rendering
@@ -15,16 +15,27 @@ void ShaderManager::InitShader()
     shaderMap["DirectionalShadowDepth"] = new Shader("Shaders/Shadow/SimpleShadow.vert", "Shaders/EmptyFrag.frag");
     shaderMap["CascadeDirectionalShadowDepth"] = new Shader("Shaders/Shadow/LayeredShadow.vert", "Shaders/EmptyFrag.frag", "Shaders/Shadow/CascadeShadow.geom");
     shaderMap["PointShadowDepth"] = new Shader("Shaders/Shadow/LayeredShadow.vert", "Shaders/Shadow/PointShadow.frag", "Shaders/Shadow/PointShadow.geom");
-    shaderMap["VisualizeShadowMap"] = new Shader("Shaders/Shadow/VisualizeShadowMap.vert", "Shaders/Shadow/VisualizeShadowMap.frag");
 
     // SSAO
     shaderMap["SSAO"] = new Shader("Shaders/PostProcess.vert", "Shaders/Indirect/SSAO/SSAO.frag");
     shaderMap["SSAOBlur"] = new Shader("Shaders/PostProcess.vert", "Shaders/Indirect/SSAO/SSAOBlur.frag");
 
     // VXGI
+    shaderMap["VoxelScene"] = new Shader("Shaders/Indirect/VXGI/VoxelScene.vert", "Shaders/Indirect/VXGI/VoxelScene.frag", "Shaders/Indirect/VXGI/VoxelScene.geom");
+    shaderMap["VXGILightInject"] = new Shader("Shaders/Indirect/VXGI/LightInject.comp");
+    shaderMap["VoxelMipmapGenerate"] = new Shader("Shaders/Indirect/VXGI/VoxelMipmapGenerate.comp");
 
     // Post Process
     shaderMap["ToneMapping"] = new Shader("Shaders/PostProcess.vert", "Shaders/ToneMapping.frag");
+
+    // Util
+    shaderMap["IrradianceConv"] = new Shader("Shaders/CubeMap.vert", "Shaders/IrradianceConvolution.frag");
+
+    // Debug
+    shaderMap["VisualizeShadowMap"] = new Shader("Shaders/Debug/VisualizeShadowMap.vert", "Shaders/Debug/VisualizeShadowMap.frag");
+    shaderMap["VisualizeVoxel"] = new Shader("Shaders/PostProcess.vert", "Shaders/Debug/VisualizeVoxel.frag");
+    shaderMap["TestShader"] = new Shader("Shaders/Debug/TestShader.vert", "Shaders/Debug/TestShader.frag");
+
 }
 
 Shader* ShaderManager::GetShader(const std::string &shaderKey)

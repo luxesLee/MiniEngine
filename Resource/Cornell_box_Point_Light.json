@@ -76,5 +76,16 @@
         "green": {
             "color": [0.14, 0.45, 0.091]
         }
+    },
+    "envMap": {
+      "cubeMap": 1,
+      "path": [
+        "../../Resource/SkyBox/right.jpg",
+        "../../Resource/SkyBox/left.jpg",
+        "../../Resource/SkyBox/top.jpg",
+        "../../Resource/SkyBox/bottom.jpg",
+        "../../Resource/SkyBox/front.jpg",
+        "../../Resource/SkyBox/back.jpg"
+      ]
     }
 }

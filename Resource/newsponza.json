@@ -42,5 +42,16 @@
       "mesh": "quad",
       "size": 100
     }
-  ]
+  ],
+  "envMap": {
+    "cubeMap": 1,
+    "path": [
+      "../../Resource/SkyBox/right.jpg",
+      "../../Resource/SkyBox/left.jpg",
+      "../../Resource/SkyBox/top.jpg",
+      "../../Resource/SkyBox/bottom.jpg",
+      "../../Resource/SkyBox/front.jpg",
+      "../../Resource/SkyBox/back.jpg"
+    ]
+  }
 }

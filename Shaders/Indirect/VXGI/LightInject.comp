@@ -1,0 +1,209 @@
+#version 430 core
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout(rgba8, binding = 0) uniform image3D radianceImg;
+
+layout(binding = 0) uniform sampler3D albedo3DTex;
+layout(binding = 1) uniform sampler3D normal3DTex;
+layout(binding = 2) uniform samplerBuffer lightTex;
+
+layout(binding = 9) uniform sampler2D directionalMap;
+layout(binding = 10) uniform sampler2DArray cascadeShadowMap;
+layout(binding = 11) uniform samplerCube pointShadowMap[2];
+layout(binding = 13) uniform sampler2D otherShadowMap[2];
+
+layout(binding = 0) uniform CommonUBO
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 projectionView;
+    mat4 invProjection;
+    mat4 invViewProjection;
+    vec4 screenAndInvScreen;
+    vec4 cameraPosition;
+    int lightNum;
+};
+
+uniform int VoxelSize;
+uniform mat4 cascadeMat[6];
+uniform mat4 lightMat[3];   // Directional and other
+uniform int cascadeLevel;
+uniform bool bCascade;
+uniform mat4 invProject;
+
+
+int pointTexIndex = 0, otherTexIndex = 0;
+// --------------------------------------------------------------------------
+#define DIRECTIONAL 0
+#define POINT 1
+#define SPOT 2
+#define QUAD 3
+struct Light
+{
+    vec4 position;
+    vec4 direction;
+    vec4 color;
+    int bActive;
+    float range;
+    int type;
+    float outerCosine;
+    float innerCosine;
+    vec3 u;
+    vec3 v;
+    float dis;
+};
+
+Light GetLightData(int index)
+{
+    int lightIndex = 6 * index;
+
+    Light data;
+    data.position = texelFetch(lightTex, lightIndex);
+    data.direction = texelFetch(lightTex, lightIndex + 1);
+    data.color = texelFetch(lightTex, lightIndex + 2);
+    
+    vec4 param4 = texelFetch(lightTex, lightIndex + 3);
+    vec4 param5 = texelFetch(lightTex, lightIndex + 4);
+    vec4 param6 = texelFetch(lightTex, lightIndex + 5);
+
+    data.bActive = floatBitsToInt(param4.x);
+    data.range = param4.y;
+    data.type = floatBitsToInt(param4.z);
+    data.outerCosine = param4.w;
+
+    data.innerCosine = param5.x;
+    data.u = param5.yzw;
+    data.v = param6.xyz;
+
+    if(data.type == QUAD)
+    {
+        data.direction.xyz = normalize(cross(data.u, data.v));
+    }
+
+    return data;
+}
+
+float GetShadowFactorDirectional(vec3 pos, float bias)
+{
+    vec4 shadowMapPos = lightMat[0] * vec4(pos, 1.0f);
+    vec3 UVD = shadowMapPos.xyz / shadowMapPos.w;
+    UVD.xyz = 0.5 * UVD.xyz + 0.5;
+    if(UVD.z < 0.0f)
+    {
+        return 1.0f;
+    }
+
+    return (UVD.z <= texture(directionalMap, UVD.xy).r + bias) ? 1.0 : 0.0;
+}
+
+vec3 GetDirectionalRadiance(Light light, vec3 pos, vec3 normal, vec3 color)
+{
+    vec3 lightDirection = light.direction.xyz;
+    float bias = max(0.05 * (1.0 - dot(normal, lightDirection)), 0.005);
+
+    float visibility = GetShadowFactorDirectional(pos, bias);
+    if(visibility == 0.0f)
+    {
+        return vec3(0);
+    }
+
+    lightDirection = -lightDirection;
+    float NDotL = clamp(dot(normal, lightDirection), 0, 1.0f);
+    if(NDotL == 0.0f)
+    {
+        return vec3(0);
+    }
+
+    return color * NDotL * visibility * light.color.rgb;
+}
+
+float GetShadowFactorPoint(vec3 position, vec3 lightPos)
+{
+    vec3 l2p = position - lightPos;
+    float currentDepth = length(l2p);
+    return currentDepth < 5.0 * texture(pointShadowMap[pointTexIndex], l2p).r + 0.05f ? 1.0f : 0.0f;
+}
+
+vec3 GetPointRadiance(Light light, vec3 pos, vec3 normal, vec3 color)
+{
+    vec3 lightDirection = light.position.xyz - pos;
+    float dis = length(lightDirection);
+    lightDirection /= dis;
+
+    float attenuation = clamp(1.0f - (dis * dis) / (light.range * light.range), 0.0f, 1.0f);
+    attenuation *= GetShadowFactorPoint(pos, light.position.xyz);
+    if(attenuation <= 0.0f)
+    {
+        return vec3(0);
+    }
+
+    float NDotL = clamp(dot(normal, lightDirection), 0, 1.0f);
+    if(NDotL == 0.0f)
+    {
+        return vec3(0);
+    }
+
+    return NDotL * color * attenuation * light.color.rgb;
+}
+
+vec3 GetWorldPosFromVoxelPos(ivec3 voxelPos)
+{
+    vec3 ndc = (2.0 * voxelPos / VoxelSize) - vec3(1.0f);
+    return (invProject * vec4(ndc, 1.0f)).xyz;
+}
+
+vec3 DecodeNormal(vec3 normal)
+{
+    return normal * 2.0f - vec3(1.0f);
+}
+
+void main()
+{
+    if(gl_GlobalInvocationID.x >= VoxelSize ||
+		gl_GlobalInvocationID.y >= VoxelSize ||
+		gl_GlobalInvocationID.z >= VoxelSize) 
+    {
+        return;
+    }
+
+    ivec3 VoxelPos = ivec3(gl_GlobalInvocationID);
+    vec4 color = texelFetch(albedo3DTex, VoxelPos, 0);
+    vec3 worldNormal = DecodeNormal(texelFetch(normal3DTex, VoxelPos, 0).xyz);
+    vec3 worldPosition = GetWorldPosFromVoxelPos(VoxelPos);
+
+    vec3 radiance = vec3(0);
+    for(int i = 0; i < lightNum; i++)
+    {
+        Light light = GetLightData(i);
+        if(light.type == DIRECTIONAL)
+        {
+            if(i > 0)
+            {
+                continue;
+            }
+            radiance += GetDirectionalRadiance(light, worldPosition, worldNormal, color.rgb);
+        }
+        else if(light.type == POINT)
+        {
+            if(pointTexIndex >= 2)
+            {
+                continue;
+            }
+            radiance += GetPointRadiance(light, worldPosition, worldNormal, color.rgb);
+            pointTexIndex++;
+        }
+        else 
+        {
+            if(otherTexIndex >= 2)
+            {
+                continue;
+            }
+
+            otherTexIndex++;
+        }
+    }
+
+    imageStore(radianceImg, VoxelPos, vec4(radiance, 1.0f));
+}

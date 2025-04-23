@@ -3,6 +3,7 @@
 #include <map>
 #include <functional>
 #include <utility>
+#include "stb_image.h"
 #define TINYOBJLOADER_IMPLEMENTATION 
 #include "tiny_obj_loader.h"
 #include "gtc/matrix_transform.hpp"
@@ -13,7 +14,6 @@
 #include "Core/Texture.h"
 #include "Core/Image.h"
 
-
 void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
 {
     // Image image(filePath);
@@ -21,6 +21,26 @@ void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
     {
         // Texture* envMapTex = new Texture(image.Width(), image.Height());
         // scene->envMap = envMapTex;
+    }
+}
+
+void ModelLoader::loadEnvMap(Scene *scene, const std::vector<std::string> &filePaths)
+{
+    int width, height, nChannels;
+    scene->envMap->bCubeMap = true;
+    for(Int i = 0; i < filePaths.size(); i++)
+    {
+        unsigned char* data = stbi_load(filePaths[i].c_str(), &width, &height, &nChannels, 0);
+        if(data)
+        {
+            scene->envMap->envTextures.push_back(Texture(width, height, nChannels, filePaths[i], data));
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap texture failed to load at path: " << filePaths[i] << std::endl;
+            stbi_image_free(data);
+        }
     }
 }
 

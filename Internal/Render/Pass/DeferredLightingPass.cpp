@@ -32,6 +32,8 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
     glBindTexture(GL_TEXTURE_2D, scene->LTC1Tex.texId);
     glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, scene->LTC2Tex.texId);
+    glActiveTexture(GL_TEXTURE8);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, scene->getIrradianceEnvTexId());
 
     // 输出
     glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
@@ -56,13 +58,13 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
         {
             if(!g_Config->bCascadeShadow)
             {
-                glActiveTexture(GL_TEXTURE8);
+                glActiveTexture(GL_TEXTURE9);
                 glBindTexture(GL_TEXTURE_2D, shadowMapCache.shadowPassDepthTexIds);
                 shaderDeferredLighting->setMat4("lightMat", shadowMapCache.lightMats[0]);
             }
             else
             {
-                glActiveTexture(GL_TEXTURE9);
+                glActiveTexture(GL_TEXTURE10);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapCache.shadowPassDepthTexIds);
                 for(Int cascadeIndex = 0; cascadeIndex < g_Config->cascadeLevel; cascadeIndex++)
                 {
@@ -72,13 +74,13 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
         }
         else if(light->type == POINT_LIGHT && pointTexIndex < 2)
         {
-            glActiveTexture(GL_TEXTURE10 + pointTexIndex);
+            glActiveTexture(GL_TEXTURE11 + pointTexIndex);
             glBindTexture(GL_TEXTURE_CUBE_MAP, shadowMapCache.shadowPassDepthTexIds);
             pointTexIndex++;
         }
         else if(otherTexIndex < 2)
         {
-            glActiveTexture(GL_TEXTURE12 + otherTexIndex);
+            glActiveTexture(GL_TEXTURE13 + otherTexIndex);
             glBindTexture(GL_TEXTURE_2D, shadowMapCache.shadowPassDepthTexIds);
             otherTexIndex++;
         }
