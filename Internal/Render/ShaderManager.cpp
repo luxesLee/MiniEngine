@@ -24,6 +24,7 @@ void ShaderManager::InitShader()
     shaderMap["VoxelScene"] = new Shader("Shaders/Indirect/VXGI/VoxelScene.vert", "Shaders/Indirect/VXGI/VoxelScene.frag", "Shaders/Indirect/VXGI/VoxelScene.geom");
     shaderMap["VXGILightInject"] = new Shader("Shaders/Indirect/VXGI/LightInject.comp");
     shaderMap["VoxelMipmapGenerate"] = new Shader("Shaders/Indirect/VXGI/VoxelMipmapGenerate.comp");
+    shaderMap["VXGIIndirectLighting"] = new Shader("Shaders/Indirect/VXGI/VXGIIndirectLighting.comp");
 
     // Post Process
     shaderMap["ToneMapping"] = new Shader("Shaders/PostProcess.vert", "Shaders/ToneMapping.frag");
@@ -33,7 +34,7 @@ void ShaderManager::InitShader()
 
     // Debug
     shaderMap["VisualizeShadowMap"] = new Shader("Shaders/Debug/VisualizeShadowMap.vert", "Shaders/Debug/VisualizeShadowMap.frag");
-    shaderMap["VisualizeVoxel"] = new Shader("Shaders/PostProcess.vert", "Shaders/Debug/VisualizeVoxel.frag");
+    shaderMap["VisualizeVoxel"] = new Shader("Shaders/Debug/VisualizeVoxel.vert", "Shaders/Debug/VisualizeVoxel.frag",  "Shaders/Debug/VisualizeVoxel.geom");
     shaderMap["TestShader"] = new Shader("Shaders/Debug/TestShader.vert", "Shaders/Debug/TestShader.frag");
 
 }

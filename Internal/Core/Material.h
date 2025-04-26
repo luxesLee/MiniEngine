@@ -31,7 +31,7 @@ struct Material
 
     float baseColorTexId;
     float metallicRoughnessTexID;
-    int normalmapTexID;
+    float normalmapTexID;
     float emissionmapTexID;
 
     float opacity;
@@ -67,7 +67,7 @@ struct Material
 
         baseColorTexId         = -1.0f;
         metallicRoughnessTexID = -1.0f;
-        normalmapTexID         = -1;
+        normalmapTexID         = -1.0f;
         emissionmapTexID       = -1.0f;
 
         opacity     = 1.0f;

@@ -5,10 +5,11 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 uv;
 layout(location = 3) in float matID;    // 这里用int有错误
 
-layout(location = 0) out vec3 ViewPosition;
-layout(location = 1) out vec3 ViewNormal;
+layout(location = 0) out vec3 Position;
+layout(location = 1) out vec3 Normal;
 layout(location = 2) out vec2 TexCoord;
 layout(location = 3) flat out int MatID;
+layout(location = 4) out mat3 TBN;
 
 layout(binding = 0) uniform CommonUBO
 {
@@ -27,6 +28,15 @@ layout(binding = 0)uniform sampler2D transformTex;
 
 uniform int instanceBase;
 
+vec3 GetPerpVector(vec3 u)
+{
+    vec3 a = abs(u);
+    uint xm = ((a.x - a.y) < 0 && (a.x - a.z) < 0) ? 1 : 0;
+    uint ym = (a.y - a.z) < 0 ? (1 ^ xm) : 0;
+    uint zm = 1 ^ (xm | ym);
+    return cross(u, vec3(xm, ym, zm));
+}
+
 void main()
 {
     vec4 r1 = texelFetch(transformTex, ivec2((gl_InstanceID + instanceBase) * 4 + 0, 0), 0);
@@ -37,8 +47,13 @@ void main()
 
     vec4 worldPos = instanceModelMat * vec4(vertex, 1.0f);
     gl_Position = projectionView * worldPos;
-    ViewPosition = (view * worldPos).xyz;
-    ViewNormal = normalize(transpose(inverse(mat3(view * instanceModelMat))) * normal);
+    Position = worldPos.xyz;
+
+    Normal = normalize(transpose(inverse(mat3(instanceModelMat))) * normal);
+    vec3 Bitangent = normalize(GetPerpVector(normal));
+    vec3 Tangent = normalize(cross(Bitangent, Normal));
+    TBN = mat3(Tangent, Bitangent, Normal);
+
     TexCoord = uv;
     MatID = floatBitsToInt(matID);
 }

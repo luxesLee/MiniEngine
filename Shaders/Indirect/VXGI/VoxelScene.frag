@@ -166,12 +166,13 @@ void imageAtomicRGBA8Avg(layout(r32ui) volatile coherent uimage3D imgUI, ivec3 c
     }
 }
 
+#define INVPI 0.31830989161
 void main()
 {
     vec3 normal = fs_in.Normal;
     Material mat = GetMatrixData(fs_in.MatID, fs_in.TexCoords, normal);
+    vec3 color = mat.baseColor * (1 - mat.metallic) * INVPI;
 
-    vec3 color = mat.baseColor;
     imageAtomicRGBA8Avg(colorVoxel, ivec3(fs_in.VoxelPosition), vec4(color, 1.0f));
     imageAtomicRGBA8Avg(normalVoxel, ivec3(fs_in.VoxelPosition), vec4(EncodeNormal(normal), 1.0f));
 }

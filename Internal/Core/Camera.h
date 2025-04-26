@@ -1,8 +1,10 @@
 #pragma once
 #include <algorithm>
+#include <vector>
 #include "glad/glad.h"
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
+#include "gtc/matrix_access.hpp"
 #include "Config.h"
 
 enum Camera_Movement {
@@ -10,6 +12,41 @@ enum Camera_Movement {
     BACKWARD,
     LEFT,
     RIGHT
+};
+
+class Frustum
+{
+public:
+    enum FrustumPlane
+    {
+        Left, Right, Bottom, Top, Near, Far,
+    };
+
+    static std::vector<glm::vec4> ExtractFrustumPlanes(const glm::mat4& mat)
+    {
+        std::vector<glm::vec4> frustumPlanes(6);
+        glm::vec4 mRow[4] = 
+        {
+            glm::row(mat, 0),
+            glm::row(mat, 1),
+            glm::row(mat, 2),
+            glm::row(mat, 3)
+        };
+
+        frustumPlanes[Left] = mRow[3] + mRow[0];
+        frustumPlanes[Right] = mRow[3] - mRow[0];
+        frustumPlanes[Bottom] = mRow[3] + mRow[1];
+        frustumPlanes[Top] = mRow[3] - mRow[1];
+        frustumPlanes[Near] = mRow[3] + mRow[2];
+        frustumPlanes[Far] = mRow[3] - mRow[2];
+
+        for(auto& p : frustumPlanes)
+        {
+            p /= glm::length(p);
+        }
+
+        return frustumPlanes;
+    }
 };
 
 class Camera
@@ -74,6 +111,11 @@ public:
     glm::vec4 GetScreenAndInvScreen()
     {
         return glm::vec4(g_Config->screenWidth, screenHeight, 1.0 / g_Config->screenWidth, 1.0 / screenHeight);
+    }
+
+    std::vector<glm::vec4> GetFrustum()
+    {
+        return Frustum::ExtractFrustumPlanes(GetProjectionMatrix() * GetViewMatrix());
     }
 
     // processes input received from any keyboard-like input system. Accepts input parameter in the form of camera defined ENUM (to abstract it from windowing systems)

@@ -116,7 +116,7 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
 
         material.baseColor = Vec3((float)pbr.baseColorFactor[0], (float)pbr.baseColorFactor[1], (float)pbr.baseColorFactor[2]);
         if (pbr.baseColorTexture.index > -1)
-            material.baseColorTexId = pbr.baseColorTexture.index + scene->textures.size();
+            material.baseColorTexId = (float)pbr.baseColorTexture.index + scene->textures.size();
         
         material.opacity = (float)pbr.baseColorFactor[3];
 
@@ -125,13 +125,13 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
         material.roughness = sqrtf((float)pbr.roughnessFactor);
         material.metallic = (float)pbr.metallicFactor;
         if (pbr.metallicRoughnessTexture.index > -1)
-            material.metallicRoughnessTexID = pbr.metallicRoughnessTexture.index + scene->textures.size();
+            material.metallicRoughnessTexID = (float)pbr.metallicRoughnessTexture.index + scene->textures.size();
 
-        material.normalmapTexID = mat.normalTexture.index + scene->textures.size();
+        material.normalmapTexID = (float)mat.normalTexture.index + scene->textures.size();
 
         material.emission = vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
         if (mat.emissiveTexture.index > -1)
-            material.emissionmapTexID = mat.emissiveTexture.index + scene->textures.size();
+            material.emissionmapTexID = (float)mat.emissiveTexture.index + scene->textures.size();
 
         if (mat.extensions.find("KHR_materials_transmission") != mat.extensions.end())
         {

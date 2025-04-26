@@ -1,0 +1,196 @@
+#version 430 core
+
+layout (local_size_x = 32, local_size_y = 32) in;
+
+layout(rgba32f, binding = 0) uniform image2D outputImg;
+
+layout(binding = 0) uniform sampler2D GBuffer0;
+layout(binding = 1) uniform sampler2D GBuffer1;
+layout(binding = 2) uniform sampler2D GBuffer2;
+layout(binding = 3) uniform sampler2D GBuffer3;
+layout(binding = 4) uniform sampler3D Radiance3D;
+
+layout(binding = 0) uniform CommonUBO
+{
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 projectionView;
+    mat4 invProjection;
+    mat4 invViewProjection;
+    vec4 screenAndInvScreen;
+    vec4 cameraPosition;
+    int lightNum;
+};
+
+uniform int VoxelSize;
+uniform float VoxelMaxCoord;    // Voxel在世界空间中大小的一半
+uniform float CellSize; // Voxel每个体素在世界空间中的大小
+uniform mat4 VoxelProjection;
+uniform int VoxelMipmapLevel;
+uniform vec3 VoxelWorldMinPt;
+uniform vec3 VoxelWorldMaxPt;
+
+const float PI = 3.14159265f;
+
+
+struct Brdf
+{
+    vec3 diffuseAlbedo;
+    vec3 specularF0;
+    float roughness;
+};
+
+float DielectricSpecularToF0(float specular)
+{
+    return 0.08f * specular;
+}
+
+// F0 = mix(vec3(), albedo(baseColor), metallic);
+vec3 ComputeF0(float specular, vec3 baseColor, float metalness)
+{
+    return mix(DielectricSpecularToF0(specular).xxx, baseColor, metalness);
+}
+
+Brdf GetBrdfData(vec3 baseColor, float specularTint, float metallic, float roughness)
+{
+    Brdf data;
+    data.diffuseAlbedo = baseColor * (1 - metallic);
+    data.specularF0 = ComputeF0(specularTint, baseColor, metallic);
+    data.roughness = roughness;
+    return data;
+}
+
+vec3 GetVoxelPosFromWorldPos(vec3 worldPos)
+{
+    vec4 ndc = VoxelProjection * vec4(worldPos, 1.0f);
+    return clamp(((ndc + 1.0f) * 0.5f).xyz, vec3(0.0f), vec3(1.0f));
+}
+
+vec4 VoxelSampleLod(vec3 pos, float diameter)
+{
+    float MipLevel = log2(max(diameter, CellSize) / CellSize);
+    return textureLod(Radiance3D, GetVoxelPosFromWorldPos(pos), min(VoxelMipmapLevel, MipLevel));
+}
+
+bool IntersectWithVoxel(vec3 pos, vec3 direction)
+{
+    vec3 tmpMin = (VoxelWorldMinPt - pos) / direction;
+    vec3 tmpMax = (VoxelWorldMaxPt - pos) / direction;
+
+    vec3 v3Max = max(tmpMax, tmpMin);
+    vec3 v3Min = min(tmpMax, tmpMin);
+
+    float leave = min(v3Max.x, min(v3Max.y, v3Max.z));
+    float enter = max(max(v3Min.x, 0.0), max(v3Min.y, v3Min.z));   
+
+    return leave > enter;
+}
+
+vec4 ConeTracing(vec3 origin, vec3 normal, vec3 direction, float aperture)
+{
+    vec3 startPos = origin + normal * CellSize;    // 初始时原点往法线方向偏一个Cell的大小，防止采样到自身
+    float t = CellSize; // 初始时Cone的高
+    float occlusion = 0;
+    vec4 color = vec4(0);
+
+    // if(!IntersectWithVoxel(origin, direction))
+    // {
+    //     color.a = 1.0f;
+    // }
+
+    // Ray Marching
+    while(color.a < 1 && t <= VoxelMaxCoord * 2)
+    {
+        vec3 conePosition = startPos + direction * t;
+        float diameter = 2.0 * t * aperture;
+        vec4 voxelSample = VoxelSampleLod(conePosition, diameter);
+        color += (1.0f - color.a) * voxelSample;
+        if(occlusion < 1.0f)
+        {
+            occlusion += ((1.0f - occlusion) * voxelSample.a) / (1.0f + diameter);
+        }
+        t += diameter * 0.5f;
+    }
+    return vec4(color.rgb, occlusion);
+}
+
+const vec3 diffuseConeDirections[] =
+{
+    vec3(0.0f, 1.0f, 0.0f),
+    vec3(0.0f, 0.5f, 0.866025f),
+    vec3(0.823639f, 0.5f, 0.267617f),
+    vec3(0.509037f, 0.5f, -0.7006629f),
+    vec3(-0.50937f, 0.5f, -0.7006629f),
+    vec3(-0.823639f, 0.5f, 0.267617f)
+};
+
+const float diffuseConeWeights[] =
+{
+    PI / 4.0f,
+    3.0f * PI / 20.0f,
+    3.0f * PI / 20.0f,
+    3.0f * PI / 20.0f,
+    3.0f * PI / 20.0f,
+    3.0f * PI / 20.0f,
+};
+
+vec4 CalculateIndirectLighting(vec3 pos, vec3 normal, Brdf brdf, bool bAO)
+{
+    vec4 specularTrace = vec4(0);
+    vec4 diffuseTrace = vec4(0);
+
+    if(any(greaterThan(brdf.specularF0, specularTrace.rgb)))
+    {
+        vec3 viewDirection = cameraPosition.xyz - pos;
+        vec3 reflectedDir = normalize(reflect(-viewDirection, normal));
+        specularTrace += ConeTracing(pos, normal, reflectedDir, 0.1f);
+        specularTrace.rgb *= brdf.specularF0;
+    }
+
+    if(any(greaterThan(brdf.diffuseAlbedo, diffuseTrace.rgb)))
+    {
+        vec3 guide = vec3(0, 1, 0);
+        if(abs(dot(normal, guide)) == 1.0f)
+        {
+            guide = vec3(0, 0, 1);
+        }
+
+        vec3 right = normalize(guide - dot(normal, guide) * normal);
+        vec3 up = cross(right, normal);
+
+        for(int i = 0; i < 6; i++)
+        {
+            vec3 coneDirection = normal;
+            coneDirection += diffuseConeDirections[i].x * right + diffuseConeDirections[i].z * up;
+            coneDirection = normalize(coneDirection);
+            diffuseTrace += ConeTracing(pos, normal, coneDirection, 0.57735f) * diffuseConeWeights[i];
+        }
+        diffuseTrace.rgb *= brdf.diffuseAlbedo;
+    }
+
+    vec3 result = (diffuseTrace.rgb + specularTrace.rgb);
+    return vec4(result, bAO ? clamp(1.0f - diffuseTrace.a, 0.0, 1.0) : 1.0);
+}
+
+void main()
+{
+    ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+    vec3 directLighting = (imageLoad(outputImg, uv)).xyz;
+
+    vec3 worldPosition = texelFetch(GBuffer0, uv, 0).xyz;
+    vec3 worldNormal = texelFetch(GBuffer1, uv, 0).xyz;
+    vec3 color = texelFetch(GBuffer3, uv, 0).xyz;
+
+    vec4 param2 = texelFetch(GBuffer2, uv, 0);
+    Brdf brdf = GetBrdfData(color, param2.x, param2.y, param2.z);
+
+    vec4 indirectLighting = CalculateIndirectLighting(worldPosition, worldNormal, brdf, true);
+    indirectLighting.rgb = pow(indirectLighting.rgb, vec3(2.2f));
+
+    vec3 FinalColor = (directLighting + indirectLighting.rgb);
+    FinalColor = FinalColor / (FinalColor + vec3(1.0f));
+
+    FinalColor = pow(FinalColor, vec3(1.0f / 2.2f));
+    imageStore(outputImg, uv, vec4(FinalColor, 1.0f));
+}

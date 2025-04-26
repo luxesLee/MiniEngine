@@ -170,6 +170,11 @@ void main()
 
     ivec3 VoxelPos = ivec3(gl_GlobalInvocationID);
     vec4 color = texelFetch(albedo3DTex, VoxelPos, 0);
+    if(color.a == 0)
+    {
+        return;
+    }
+
     vec3 worldNormal = DecodeNormal(texelFetch(normal3DTex, VoxelPos, 0).xyz);
     vec3 worldPosition = GetWorldPosFromVoxelPos(VoxelPos);
 

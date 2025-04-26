@@ -1,18 +1,21 @@
 #version 430 core
 
-layout(location = 0) in vec3 ViewPosition;
-layout(location = 1) in vec3 ViewNormal;
+layout(location = 0) in vec3 Position;
+layout(location = 1) in vec3 Normal;
 layout(location = 2) in vec2 TexCoord;
 layout(location = 3) flat in int MatID;
+layout(location = 4) in mat3 TBN;
 
-// GBuffer0 ViewPos(RGB8)|AO(A8)
-// GBuffer1 ViewNormal(RGB8)|Emission.r(A8)
-// GBuffer2 Metallic(R8)|Specular(R8)|Roughness(R8)|Emission.g(A8)
-// GBuffer3 BaseColor(RGB8)|Emission.b(A8)
+// GBuffer0 WorldPos(RGB8)|AO(A8)
+// GBuffer1 WorldNormal(RGB8)
+// GBuffer2 specularTint|metallic|roughness
+// GBuffer3 BaseColor(RGB8)
+// GBuffer4 Emission(RGB8)
 layout(location = 0) out vec4 GBuffer0;
 layout(location = 1) out vec4 GBuffer1;
 layout(location = 2) out vec4 GBuffer2;
 layout(location = 3) out vec4 GBuffer3;
+layout(location = 4) out vec4 GBuffer4;
 
 layout(binding = 1) uniform sampler2D matTex;
 layout(binding = 2)uniform sampler2DArray textureMapsArrayTex;
@@ -65,10 +68,10 @@ struct Material
     // float mediumAnisotropy;
     Medium medium;
 
-    float baseColorTexId;
-    float metallicRoughnessTexID;
+    int baseColorTexId;
+    int metallicRoughnessTexID;
     int normalmapTexID;
-    float emissionmapTexID;
+    int emissionmapTexID;
 
     float opacity;
     float alphaMode;
@@ -79,7 +82,6 @@ struct Material
 Material GetMatrixData(int matID, vec2 uv)
 {
     int matIndex = 8 * matID;
-    //vec2 uv = hitInfo.barycentricUV;
 
     vec4 param1 = texelFetch(matTex, ivec2(matIndex + 0, 0), 0);
     vec4 param2 = texelFetch(matTex, ivec2(matIndex + 1, 0), 0);
@@ -114,7 +116,7 @@ Material GetMatrixData(int matID, vec2 uv)
     data.medium.color       = param6.rgb;
     data.medium.anisotropy  = clamp(param6.w, -0.9, 0.9);
 
-    ivec4 texIDs           = ivec4(param7);
+    ivec4 texIDs            = ivec4(param7);
 
     data.opacity            = param8.x;
     data.alphaMode          = int(param8.y);
@@ -134,11 +136,12 @@ Material GetMatrixData(int matID, vec2 uv)
         data.roughness = max(matRgh.y, 0.001);
     }
 
-    // // if(texIDs.z >= 0)
-    // // {
-    // //     vec3 texNormal = texture(textureMapsArrayTex, vec3(uv, texIDs.z)).rgb;
-    // //     texNormal = normalize(texNormal * 2.0 - 1.0);
-    // // }
+    if(texIDs.z >= 0)
+    {
+        vec3 normal = texture(textureMapsArrayTex, vec3(uv, texIDs.z)).rgb;
+        normal = normalize(normal * 2.0 - 1.0);
+        GBuffer1.rgb = normalize(TBN * normal);
+    }
 
     if(texIDs.w >= 0)
     {
@@ -148,15 +151,27 @@ Material GetMatrixData(int matID, vec2 uv)
     return data;
 }
 
+vec3 GetPerpVector(vec3 u)
+{
+    vec3 a = abs(u);
+    uint xm = ((a.x - a.y) < 0 && (a.x - a.z) < 0) ? 1 : 0;
+    uint ym = (a.y - a.z) < 0 ? (1 ^ xm) : 0;
+    uint zm = 1 ^ (xm | ym);
+    return cross(u, vec3(xm, ym, zm));
+}
+
 void main()
 {
-    GBuffer0.rgb = ViewPosition;
-    GBuffer1.rgb = ViewNormal;
+    GBuffer0.rgb = Position;
+    GBuffer1.rgb = Normal;
+
     Material mat = GetMatrixData(MatID, TexCoord);
-    GBuffer2.rgb = vec3(mat.metallic, mat.specularTint, mat.roughness);
+    GBuffer2.x = mat.specularTint;
+    GBuffer2.y = mat.metallic;
+    GBuffer2.z = mat.roughness;
+
     GBuffer3.rgb = mat.baseColor;
     GBuffer3.a = MatID;
-    GBuffer1.a = mat.emission.r;
-    GBuffer2.a = mat.emission.g;
-    GBuffer3.a = mat.emission.b;
+    
+    GBuffer4.rgb = mat.emission;
 }

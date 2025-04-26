@@ -30,7 +30,7 @@ void VXGIPass::Init()
 
     glGenTextures(1, &radiance3DTexId);
     glBindTexture(GL_TEXTURE_3D, radiance3DTexId);
-    glTexStorage3D(GL_TEXTURE_3D, 8, GL_RGBA8, g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize);
+    glTexStorage3D(GL_TEXTURE_3D, Int(std::log2(g_Config->VoxelSize / 8)), GL_RGBA8, g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
@@ -57,7 +57,42 @@ void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sc
 
 void VXGIPass::AddIndirectLightingPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
+    Shader* shaderVXGIIndirectLighting = g_ShaderManager.GetShader("VXGIIndirectLighting");
+    if(!shaderVXGIIndirectLighting)
+    {
+        return;
+    }
 
+    glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[0]);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[1]);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[2]);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[3]);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_3D, radiance3DTexId);
+
+    shaderVXGIIndirectLighting->use();
+    auto bounds = scene->GetSceneBoundingBox();
+    auto center = bounds.center();
+    float maxCoord = glm::compMax(glm::abs(center - bounds.pmax)) * 1.1;
+    projMat = glm::ortho(-maxCoord, maxCoord, -maxCoord, maxCoord, 0.001f, 2 * maxCoord + 0.001f)
+                     * glm::lookAt(center - glm::vec3(0, 0, maxCoord), center, glm::vec3(0, 1, 0));
+
+    shaderVXGIIndirectLighting->setInt("VoxelSize", g_Config->VoxelSize);
+    shaderVXGIIndirectLighting->setFloat("VoxelMaxCoord", maxCoord);
+    shaderVXGIIndirectLighting->setFloat("CellSize", 2 * maxCoord / g_Config->VoxelSize);
+    shaderVXGIIndirectLighting->setMat4("VoxelProjection", projMat);
+    shaderVXGIIndirectLighting->setInt("VoxelMipmapLevel", Int(std::log2(g_Config->VoxelSize / 8)));
+
+    shaderVXGIIndirectLighting->setVec3("VoxelWorldMinPt", center - vec3(maxCoord));
+    shaderVXGIIndirectLighting->setVec3("VoxelWorldMaxPt", center + vec3(maxCoord));
+
+    glDispatchCompute(g_Config->wholeWidth / 32, g_Config->screenHeight / 32, 1);
 }
 
 void VXGIPass::AddDebugPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
@@ -69,21 +104,31 @@ void VXGIPass::AddDebugPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sc
         return;
     }
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D, radiance3DTexId);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[0]);
+    glClearDepth(0.0f);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glBindImageTexture(0, radiance3DTexId, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA8);
 
     shaderVisualizeVoxel->use();
-    shaderVisualizeVoxel->setInt("VoxelSize", g_Config->VoxelSize);
     auto bounds = scene->GetSceneBoundingBox();
     auto center = bounds.center();
     float maxCoord = glm::compMax(glm::abs(center - bounds.pmax)) * 1.1;
     projMat = glm::ortho(-maxCoord, maxCoord, -maxCoord, maxCoord, 0.001f, 2 * maxCoord + 0.001f)
                      * glm::lookAt(center - glm::vec3(0, 0, maxCoord), center, glm::vec3(0, 1, 0));
-    shaderVisualizeVoxel->setMat4("VoxelProjection", projMat);
+    shaderVisualizeVoxel->setMat4("voxelProjection", projMat);
+    shaderVisualizeVoxel->setMat4("voxelInvProjection", glm::inverse(projMat));
+    shaderVisualizeVoxel->setInt("VoxelSize", g_Config->VoxelSize);
+    shaderVisualizeVoxel->setFloat("CellSize", 2 * maxCoord / g_Config->VoxelSize);
+    auto frustums = g_Camera->GetFrustum();
+    for(int i = 0; i < 6; i++)
+    {
+        shaderVisualizeVoxel->setVec4("frustumPlanes[" + std::to_string(i) + "]", frustums[i]);
+    }
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
+
+    glDrawArrays(GL_POINTS, 0, g_Config->VoxelSize * g_Config->VoxelSize * g_Config->VoxelSize);
 }
 
 void VXGIPass::AddVoxelSceneBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
@@ -150,6 +195,7 @@ void VXGIPass::AddVoxelSceneBuildPass(FrameGraph &fg, FrameGraphBlackboard &blac
 
     DrawMesh(shaderVoxelScene, meshBatch);
 
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -222,16 +268,14 @@ void VXGIPass::AddLightInjectPass(FrameGraph &fg, FrameGraphBlackboard &blackboa
             otherTexIndex++;
         }
     }
-    checkGLError();
 
     glBindImageTexture(0, radiance3DTexId, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA8);
-    checkGLError();
     glDispatchCompute(g_Config->VoxelSize / 8, g_Config->VoxelSize / 8, g_Config->VoxelSize / 8);
+    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void VXGIPass::AddGenerateMipmapPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
-    return;
     Shader* shaderVoxelMipmapGenerate = g_ShaderManager.GetShader("VoxelMipmapGenerate");
     if(!shaderVoxelMipmapGenerate)
     {
@@ -241,7 +285,7 @@ void VXGIPass::AddGenerateMipmapPass(FrameGraph &fg, FrameGraphBlackboard &black
     glBindFramebuffer(GL_FRAMEBUFFER, voxelSceneFBO);
     shaderVoxelMipmapGenerate->use();
 
-    for(Int mipLevel = 1; mipLevel < g_Config->VoxelMipmapLvel; mipLevel++)
+    for(Int mipLevel = 1; mipLevel <= std::log2(g_Config->VoxelSize / 8); mipLevel++)
     {
         glBindImageTexture(0, radiance3DTexId, mipLevel - 1, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA8);
         glBindImageTexture(1, radiance3DTexId, mipLevel, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA8);
@@ -250,5 +294,6 @@ void VXGIPass::AddGenerateMipmapPass(FrameGraph &fg, FrameGraphBlackboard &black
         glDispatchCompute(workGroupSize, workGroupSize, workGroupSize);
         glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

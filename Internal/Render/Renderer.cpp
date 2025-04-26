@@ -184,6 +184,11 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     case LightMode::ClusterDeferred: break;
     }
 
+    if(g_Config->bVXGI)
+    {
+        vxgiPass.AddIndirectLightingPass(fg, blackboard, scene);
+    }
+
     if(g_Config->bSSR)
     {
 

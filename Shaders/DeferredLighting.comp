@@ -8,7 +8,7 @@ layout(binding = 0) uniform sampler2D GBuffer0;
 layout(binding = 1) uniform sampler2D GBuffer1;
 layout(binding = 2) uniform sampler2D GBuffer2;
 layout(binding = 3) uniform sampler2D GBuffer3;
-layout(binding = 4) uniform sampler2D DepthTex;
+layout(binding = 4) uniform sampler2D GBuffer4;
 layout(binding = 5) uniform samplerBuffer lightTex;
 layout(binding = 6) uniform sampler2D LTC1; // 逆变换矩阵
 layout(binding = 7) uniform sampler2D LTC2; // GGX预积分，菲涅尔项，0，几何衰减
@@ -168,7 +168,7 @@ vec3 SpecularBRDF(vec3 N, vec3 V, vec3 L, vec3 specular, float roughness, out ve
 
     float D = D_GGX(N, H, a);
     float Vis = V_SmithGGX(N, V, L, a);
-    F = F_Schlick(L, N, specular);
+    F = F_Schlick(V, H, specular);
 
     // DFG
     return D * Vis * F;
@@ -176,7 +176,7 @@ vec3 SpecularBRDF(vec3 N, vec3 V, vec3 L, vec3 specular, float roughness, out ve
 
 vec3 DefaultBRDF(vec3 L, vec3 V, vec3 N, vec3 diffuse, vec3 specular, float roughness)
 {
-    vec3 F;
+    vec3 F = vec3(0);
     vec3 specularBrdf = SpecularBRDF(N, V, L, specular, roughness, F);
     vec3 diffuseBrdf = diffuse * INVPI * (1.0 - F);
 
@@ -443,35 +443,8 @@ vec3 GetDirectLightingDirectional(Light light, Brdf brdf, vec3 normal, vec3 posi
             * NDotL * attenuation * light.color.rgb;
 }
 
-// --------------------------------------------------------------------------
-
-void main()
+vec3 GetDirectLighting(Brdf brdf, vec3 normal, vec3 position, vec3 direction)
 {
-    ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
-
-    vec4 param0 = texelFetch(GBuffer0, uv, 0);
-    vec4 param1 = texelFetch(GBuffer1, uv, 0);
-    vec4 param2 = texelFetch(GBuffer2, uv, 0);
-    vec4 param3 = texelFetch(GBuffer3, uv, 0);
-    float depth = texelFetch(DepthTex, uv, 0).r;
-
-    vec3 ViewPosition = param0.xyz;
-    float ssaoFactor = param0.w;
-    vec3 ViewNormal = param1.xyz;
-    float metallic = param2.x;
-    float specular = param2.y;
-    float roughness = param2.z;
-    vec3 baseColor = param3.rgb;
-    vec3 emission = vec3(param1.a, param2.a, param3.a);
-
-    vec3 worldPosition = (inverse(view) * vec4(ViewPosition, 1.0f)).xyz;
-    vec3 worldNormal = transpose(mat3(view)) * ViewNormal;
-
-    Brdf brdf = GetBrdfData(baseColor, specular, metallic, roughness);
-    vec3 viewDirection = worldPosition - cameraPosition.xyz;
-    vec3 reflectedDir = reflect(-viewDirection, worldNormal);
-
-    // 直接光照
     vec3 directLighting = vec3(0.0);
     for(int i = 0; i < lightNum; i++)
     {
@@ -482,7 +455,7 @@ void main()
             {
                 continue;
             }
-            directLighting += GetDirectLightingDirectional(light, brdf, worldNormal, worldPosition, viewDirection);
+            directLighting += GetDirectLightingDirectional(light, brdf, normal, position, direction);
         }
         else if(light.type == POINT)
         {
@@ -490,7 +463,7 @@ void main()
             {
                 continue;
             }
-            directLighting += GetDirectLightingPoint(light, brdf, worldNormal, worldPosition, viewDirection, pointTexIndex);
+            directLighting += GetDirectLightingPoint(light, brdf, normal, position, direction, pointTexIndex);
             pointTexIndex++;
         }
         else 
@@ -503,10 +476,31 @@ void main()
             otherTexIndex++;
         }
     }
+    return directLighting;
+}
 
-    // 处理AO
-    // directLighting += texture(irradianceMap, reflectedDir).rgb * brdf.diffuseAlbedo * ssaoFactor;
-    // directLighting += vec3(0.5, 0.5, 0.5) * brdf.diffuseAlbedo * (ssaoFactor > 0 ? ssaoFactor : 1.0f);
+// --------------------------------------------------------------------------
+
+void main()
+{
+    ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+
+    vec4 param0 = texelFetch(GBuffer0, uv, 0);
+    vec4 param1 = texelFetch(GBuffer1, uv, 0);
+    vec4 param2 = texelFetch(GBuffer2, uv, 0);
+    vec4 param3 = texelFetch(GBuffer3, uv, 0);
+    vec4 param4 = texelFetch(GBuffer4, uv, 0);
+
+    vec3 worldPosition = param0.xyz;
+    float ssaoFactor = param0.w;
+    vec3 worldNormal = param1.xyz;
+    Brdf brdf = GetBrdfData(param3.rgb, param2.x, param2.y, param2.z);
+    vec3 emission = param4.rgb;
+
+    vec3 viewDirection = cameraPosition.xyz - worldPosition;
+    vec3 reflectedDir = reflect(viewDirection, worldNormal);
+
+    vec3 directLighting = GetDirectLighting(brdf, worldNormal, worldPosition, viewDirection);
 
     // 自发光
     directLighting += emission;
