@@ -4,7 +4,7 @@
 #include "Core/Texture.h"
 #include "Util/Types.h"
 
-enum TextureType
+enum class TextureType
 {
     Buffer,
     Image2D,
@@ -52,11 +52,17 @@ struct GPUTexture
 
 void checkGLError();
 
+GLuint generateFBO();
+
+void deleteFBO(GLuint fboId);
+
+GPUTexture generateTexture(const TextureDesc& desc);
+
+void deleteTexture(GPUTexture tex);
+
 class RenderResHelper
 {
 public:
-    static void generateFBO();
-    static void deleteFBO();
     static GPUTexture generateGPUTexture(TextureInfo& textureInfo);
     static void destroyGPUTexture(GPUTexture& textureInfo);
     static GPUTexture generateCubeEnvMap(const std::vector<Texture>& envMap);

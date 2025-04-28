@@ -393,13 +393,38 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
         scene->meshInstances.push_back(meshInstance);
     }
 
-    // for(int i = 0; i < materials.size(); i++)
-    // {
-    //     Material material;
-    //     const auto& objMat = materials[i];
-    //     //material.baseColor = objMat.        
-    //     scene->materials.push_back(material);
-    // }
+    auto InsertTex2Scene = [&](const std::string& texName) -> Int
+    {
+        if(texName.size() > 0)
+        {
+            Image img(texName);
+            if(img.isInit())
+            {
+                Texture* texture = new Texture(img.Width(), img.Height(), 4, texName, img.Data());
+                scene->textures.push_back(texture);
+                return scene->textures.size() - 1;
+            }
+        }
+        return -1;
+    };
+
+    for(int i = 0; i < materials.size(); i++)
+    {
+        Material material;
+        const auto& objMat = materials[i];
+
+        material.baseColor = glm::vec3(objMat.diffuse[0], objMat.diffuse[1], objMat.diffuse[2]);
+        material.opacity = objMat.dissolve;
+        material.emission = glm::vec3(objMat.emission[0], objMat.emission[1], objMat.emission[2]);
+        material.roughness = (float)objMat.roughness;
+        material.metallic = (float)objMat.metallic;
+
+        material.baseColorTexId = InsertTex2Scene(objMat.diffuse_texname);
+        material.normalmapTexID = InsertTex2Scene(objMat.normal_texname);
+        material.emissionmapTexID = InsertTex2Scene(objMat.emissive_texname);
+
+        scene->materials.push_back(material);
+    }
 
     return entt::null;
 }

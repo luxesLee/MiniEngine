@@ -1,6 +1,7 @@
 #pragma once
 #include "glad/glad.h"
 #include "mat4x4.hpp"
+#include "Core/Scene.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
@@ -17,7 +18,7 @@ public:
 
     void Delete();
 
-    void AddBuildPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddBuildPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
 
     void AddIndirectLightingPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 

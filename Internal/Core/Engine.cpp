@@ -61,4 +61,10 @@ void Engine::UpdateScene(const SceneConfig& config)
     scene->BuildScene();
     scene->InitFBO();
     scene->InitShadowMapFBO();
+    renderer->InitRenderResource();
+}
+
+void Engine::ReLoad()
+{
+    
 }

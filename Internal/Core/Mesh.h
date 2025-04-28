@@ -116,12 +116,6 @@ public:
         glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 0, (void*)0);
         glEnableVertexAttribArray(3);
 
-        // if(indices.size() == 0)
-        // {
-        //     indices.resize(vertices.size());
-        //     std::iota(indices.begin(), indices.end(), 0);
-        // }
-
         if(indices.size() > 0)
         {
             glGenBuffers(1, &ebo);

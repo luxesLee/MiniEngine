@@ -18,7 +18,7 @@ public:
     void Resize();
 
     void UpdateScene(const SceneConfig& config);
-
+    void ReLoad();
 
 private:
     entt::registry reg;

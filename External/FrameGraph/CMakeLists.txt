@@ -59,11 +59,6 @@ target_include_directories(
 
 add_library(fg::FrameGraph ALIAS FrameGraph)
 
-if(FG_BUILD_TEST)
-  enable_testing()
-  add_subdirectory(tests)
-endif()
-
 include(GNUInstallDirs)
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/fg

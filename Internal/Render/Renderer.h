@@ -13,8 +13,6 @@ class FrameGraph;
 class FrameGraphBlackboard;
 class Scene;
 
-
-
 class Renderer
 {
 public:
@@ -32,6 +30,10 @@ public:
     void Render(Scene* scene);
     void Resize();
 
+    void InitRenderResource();
+
+    void DeleteRenderResource();
+
 private:
     void UpdateUBO(Scene* scene);
     
@@ -45,7 +47,10 @@ private:
 
     void PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 
+// -------------------------------------------------------------------------------------------
 private:
+    RenderResource              renderResource;
+
     GBufferPass                 basePass;
     AmbientOcclusionRenderer    aoRenderer;
     ShadowRenderer              shadowRenderer;

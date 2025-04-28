@@ -2,8 +2,9 @@
 #include "Render/ShaderManager.h"
 #include "Core/Shader.h"
 #include "Core/Camera.h"
-#include "Core/Scene.h"
 
+
+#include "Render/RenderResource.h"
 #include "fg/FrameGraph.hpp"
 #include "fg/Blackboard.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
@@ -11,45 +12,20 @@
 
 void VXGIPass::Init()
 {
-    glGenFramebuffers(1, &voxelSceneFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, voxelSceneFBO);
-
-    glGenTextures(1, &albedo3DTexId);
-    glBindTexture(GL_TEXTURE_3D, albedo3DTexId);
-    glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA8, g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-
-    glGenTextures(1, &normal3DTexId);
-    glBindTexture(GL_TEXTURE_3D, normal3DTexId);
-    glTexStorage3D(GL_TEXTURE_3D, 1, GL_RGBA8, g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-
-    glGenTextures(1, &radiance3DTexId);
-    glBindTexture(GL_TEXTURE_3D, radiance3DTexId);
-    glTexStorage3D(GL_TEXTURE_3D, Int(std::log2(g_Config->VoxelSize / 8)), GL_RGBA8, g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-
-    glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, radiance3DTexId, 0, 0);
 }
 
 void VXGIPass::Delete()
 {
-    glDeleteFramebuffers(1, &voxelSceneFBO);
-    glDeleteTextures(1, &albedo3DTexId);
-    glDeleteTextures(1, &normal3DTexId);
-    glDeleteTextures(1, &radiance3DTexId);
 }
 
-void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
+    const auto vxgiData = renderResource.get<VXGIData>();
+    voxelSceneFBO = vxgiData.voxelBuildFBO;
+    albedo3DTexId = vxgiData.albedoData;
+    normal3DTexId = vxgiData.normalData;
+    radiance3DTexId = vxgiData.radianceData;
+
     AddVoxelSceneBuildPass(fg, blackboard, scene);
     AddLightInjectPass(fg, blackboard, scene);
     AddGenerateMipmapPass(fg, blackboard, scene);
@@ -170,6 +146,7 @@ void VXGIPass::AddVoxelSceneBuildPass(FrameGraph &fg, FrameGraphBlackboard &blac
     glClearTexImage(normal3DTexId, 0, GL_RGBA, GL_UNSIGNED_BYTE, zero);
 
     glBindFramebuffer(GL_FRAMEBUFFER, voxelSceneFBO);
+    glFramebufferTexture3D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, radiance3DTexId, 0, 0);
     glBindImageTexture(0, albedo3DTexId, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
     glBindImageTexture(1, normal3DTexId, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
@@ -207,7 +184,6 @@ void VXGIPass::AddLightInjectPass(FrameGraph &fg, FrameGraphBlackboard &blackboa
         return;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, voxelSceneFBO);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, albedo3DTexId);
     glActiveTexture(GL_TEXTURE1);
@@ -282,7 +258,6 @@ void VXGIPass::AddGenerateMipmapPass(FrameGraph &fg, FrameGraphBlackboard &black
         return;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, voxelSceneFBO);
     shaderVoxelMipmapGenerate->use();
 
     for(Int mipLevel = 1; mipLevel <= std::log2(g_Config->VoxelSize / 8); mipLevel++)
@@ -294,6 +269,4 @@ void VXGIPass::AddGenerateMipmapPass(FrameGraph &fg, FrameGraphBlackboard &black
         glDispatchCompute(workGroupSize, workGroupSize, workGroupSize);
         glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

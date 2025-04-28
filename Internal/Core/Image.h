@@ -1,6 +1,7 @@
 #pragma once
-
 #include <string>
+#include <vector>
+#include "Util/Types.h"
 
 enum ImageFormat
 {
@@ -9,25 +10,27 @@ enum ImageFormat
     OTHERS,
 };
 
+// Data指针由外部释放
 class Image
 {
 public:
     explicit Image(const std::string& path);
 
-    bool isInit() const {return bInit;}
-    uint32_t Width() const {return width;}
-    uint32_t Height() const {return height;}
-    char* Data() {return data;}
+    Bool isInit() const {return bInit;}
+    Uint32 Width() const {return width;}
+    Uint32 Height() const {return height;}
+    unsigned char* Data() {return data.data();}
 
 private:
-    void loadDDS(const std::string& path);
-    void loadSTB(const std::string& path);
+    Bool loadDDS(const std::string& path);
+    Bool loadSTB(const std::string& path);
 
     ImageFormat GetImageFormat(const std::string& path);
 
 private:
-    bool bInit = false;
-    uint32_t width = 0;
-    uint32_t height = 0;
-    char* data = nullptr;
+    Bool bInit = false;
+    Bool bHdr = false;
+    Uint32 width = 0;
+    Uint32 height = 0;
+    std::vector<Uint8> data;
 };

@@ -4,13 +4,75 @@
 #include "mat4x4.hpp"
 #include "gtc/matrix_transform.hpp"
 
-void RenderResHelper::generateFBO()
+GLuint generateFBO()
 {
-    
+    GLuint fboID;
+    glGenFramebuffers(1, &fboID);
+    return fboID;
 }
 
-void RenderResHelper::deleteFBO()
+void deleteFBO(GLuint fboId)
 {
+    if(fboId != 0)
+    {
+        glDeleteFramebuffers(1, &fboId);
+    }
+}
+
+GPUTexture generateTexture(const TextureDesc& desc)
+{
+    GPUTexture gpuTex;
+    glGenTextures(1, &gpuTex.texId);
+    glBindTexture(desc.type, gpuTex.texId);
+
+    switch (desc.type)
+    {
+    case TextureType1::Buffer:
+        {
+            glGenBuffers(1, &gpuTex.texBufferId);
+            glBindBuffer(GL_TEXTURE_BUFFER, gpuTex.texBufferId);
+            glBufferData(GL_TEXTURE_BUFFER, desc.width, desc.data, GL_STATIC_DRAW);
+            glTexBuffer(GL_TEXTURE_BUFFER, desc.format, gpuTex.texBufferId);
+        }
+        break;
+    case TextureType1::TEXTURE_2D:
+        glTexImage2D(GL_TEXTURE_2D, desc.mipLevel, desc.format, desc.width, desc.height, 0, desc.dataFormat, desc.dataType, desc.data);
+        break;
+    case TextureType1::TEXTURE_2D_ARRAY:
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, desc.mipLevel, desc.format, desc.width, desc.height, desc.depth, 0, desc.dataFormat, desc.dataType, desc.data);
+        break;
+    case TextureType1::TEXTURE_3D:
+        glTexStorage3D(GL_TEXTURE_3D, desc.mipLevel, desc.format, desc.width, desc.height, desc.depth);
+        break;
+    case TextureType1::TEXTURE_CUBE_MAP:
+        break;
+    default:
+        break;
+    }
+
+    if(desc.type != TextureType1::Buffer)
+    {
+        glTexParameteri(desc.type, GL_TEXTURE_WRAP_S, desc.samplerDesc.warpS);
+        glTexParameteri(desc.type, GL_TEXTURE_WRAP_T, desc.samplerDesc.warpT);
+        glTexParameteri(desc.type, GL_TEXTURE_WRAP_R, desc.samplerDesc.warpR);
+        glTexParameteri(desc.type, GL_TEXTURE_MAG_FILTER, desc.samplerDesc.filterMag);
+        glTexParameteri(desc.type, GL_TEXTURE_MIN_FILTER, desc.samplerDesc.filterMin);
+    }
+
+    glBindTexture(desc.type, 0);
+    return gpuTex;
+}
+
+void deleteTexture(GPUTexture tex)
+{
+    if(tex.texId != 0)
+    {
+        glDeleteTextures(1, &tex.texId);
+    }
+    if(tex.texBufferId != 0)
+    {
+        glDeleteBuffers(1, &tex.texBufferId);
+    }
 }
 
 GPUTexture RenderResHelper::generateGPUTexture(TextureInfo &textureInfo)

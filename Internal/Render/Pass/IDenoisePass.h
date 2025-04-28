@@ -19,7 +19,7 @@ public:
     SVGFDenoisePass();
 
     virtual void AddPass(Scene* scene);
-    virtual DenoiseType GetType() const {return SVGF;}
+    virtual DenoiseType GetType() const {return DenoiseType::SVGF;}
 };
 
 class OIDNDenoisePass : public IDenoisePass
@@ -28,7 +28,7 @@ public:
     OIDNDenoisePass();
     ~OIDNDenoisePass();
     virtual void AddPass(Scene* scene);
-    virtual DenoiseType GetType() const {return ODIN;}
+    virtual DenoiseType GetType() const {return DenoiseType::ODIN;}
 
 private:
     std::vector<float> inputFrameVec;
@@ -41,7 +41,7 @@ class OPTIXDenoisePass : public IDenoisePass
 {
 public:
     virtual void AddPass(Scene* scene);
-    virtual DenoiseType GetType() const {return OPTIX;}
+    virtual DenoiseType GetType() const {return DenoiseType::OPTIX;}
 };
 
 IDenoisePass* CreateDenoisePass();

@@ -1,27 +1,59 @@
-#include "Image.h"
 #include <filesystem>
-
+#include "Image.h"
+// #define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 Image::Image(const std::string &path)
 {
     ImageFormat format = GetImageFormat(path);
     if(format == ImageFormat::DDS)
     {
-        loadDDS(path);
+        bInit = loadDDS(path);
     }
     else if(format == ImageFormat::STB)
     {
-        loadSTB(path);
+        bInit = loadSTB(path);
     }
 }
 
-void Image::loadDDS(const std::string &path)
+Bool Image::loadDDS(const std::string &path)
 {
-
+    return false;
 }
 
-void Image::loadSTB(const std::string &path)
+Bool Image::loadSTB(const std::string &path)
 {
+    bHdr = stbi_is_hdr(path.data());
+    Int32 _Width, _Height;
+    if(bHdr)
+    {
+        Float* _data = stbi_loadf(path.data(), &_Width, &_Height, nullptr, 4);
+        if(!_data)
+        {
+            return false;
+        }
+        width = _Width;
+        height = _Height;
+        Uint32 dataSize = 4 * sizeof(Float) * width * height;
+        data.resize(dataSize);
+        memcpy_s(data.data(), dataSize, _data, dataSize);
+        stbi_image_free(_data);
+    }
+    else
+    {
+        unsigned char* _data = stbi_load(path.data(), &_Width, &_Height, nullptr, 4);
+        if(!_data)
+        {
+            return false;
+        }
+        width = _Width;
+        height = _Height;
+        Uint32 dataSize = 4 * width * height;
+        data.resize(dataSize);
+        memcpy_s(data.data(), dataSize, _data, dataSize);
+        stbi_image_free(_data);
+    }
+    return true;
 }
 
 ImageFormat Image::GetImageFormat(const std::string &path)

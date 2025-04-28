@@ -27,7 +27,7 @@ void ShaderManager::InitShader()
     shaderMap["VXGIIndirectLighting"] = new Shader("Shaders/Indirect/VXGI/VXGIIndirectLighting.comp");
 
     // Post Process
-    shaderMap["ToneMapping"] = new Shader("Shaders/PostProcess.vert", "Shaders/ToneMapping.frag");
+    shaderMap["ToneMapping"] = new Shader("Shaders/ToneMapping.comp");
 
     // Util
     shaderMap["IrradianceConv"] = new Shader("Shaders/CubeMap.vert", "Shaders/IrradianceConvolution.frag");

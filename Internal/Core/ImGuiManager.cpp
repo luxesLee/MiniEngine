@@ -98,11 +98,11 @@ void ImGuiManager::RenderSettingWindow()
 
             // Denoiser
             const char* Denoises[] = {"None", "SVGF", "OIDN", "OPTIX"};
-            if(ImGui::BeginCombo("Current denoiser :", Denoises[g_Config->curDenoise]))
+            if(ImGui::BeginCombo("Current denoiser :", Denoises[Int(g_Config->curDenoise)]))
             {
                 for(int i = 0; i < 4; i++)
                 {
-                    bool isSelected = g_Config->curDenoise == i;
+                    bool isSelected = Int(g_Config->curDenoise) == i;
                     if(ImGui::Selectable(Denoises[i], isSelected))
                     {
                         g_Config->curDenoise = (DenoiseType)i;
@@ -117,11 +117,11 @@ void ImGuiManager::RenderSettingWindow()
 
             // ToneMapping
             const char* ToneMappings[] = {"None", "Linear", "ACES", "TonyMcMapface"};
-            if(ImGui::BeginCombo("Current ToneMapping :", ToneMappings[g_Config->curToneMapping]))
+            if(ImGui::BeginCombo("Current ToneMapping :", ToneMappings[Int(g_Config->curToneMapping)]))
             {
                 for(int i = 0; i < 4; i++)
                 {
-                    bool isSelected = g_Config->curToneMapping == i;
+                    bool isSelected = Int(g_Config->curToneMapping) == i;
                     if(ImGui::Selectable(ToneMappings[i], isSelected))
                     {
                         g_Config->curToneMapping = (ToneMappingType)i;
@@ -183,11 +183,11 @@ void ImGuiManager::RenderSettingWindow()
             return pos - 1;
         };
         const char* DebugModes[] = {"None", "Shadow", "VXGI"};
-        if(ImGui::BeginCombo("Current DebugMode :", DebugModes[highestBitPosition(g_Config->debugMode)]))
+        if(ImGui::BeginCombo("Current DebugMode :", DebugModes[highestBitPosition(Uint(g_Config->debugMode))]))
         {
             for(int i = 0; i < 3; i++)
             {
-                bool isSelected = (g_Config->debugMode == (1 << i));
+                bool isSelected = (Int(g_Config->debugMode) == (1 << i));
                 if(ImGui::Selectable(DebugModes[i], isSelected))
                 {
                     g_Config->debugMode = DebugMode(1 << i);

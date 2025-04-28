@@ -6,12 +6,13 @@
 #include "Core/Config.h"
 #include <fg/FrameGraph.hpp>
 #include <fg/Blackboard.hpp>
+#include "RenderResource.h"
 
 Renderer::Renderer()
 {
     g_ShaderManager.InitShader();
 
-    if(g_Config->curDenoise > 0)
+    if(g_Config->curDenoise != DenoiseType::NONE)
     {
         denoisePass = CreateDenoisePass();
     }
@@ -41,7 +42,7 @@ void Renderer::Update(Scene* scene)
         delete denoisePass;
         denoisePass = CreateDenoisePass();
     }
-    else if(!denoisePass && g_Config->curDenoise != DenoiseType::NONEDenoise)
+    else if(!denoisePass && g_Config->curDenoise != DenoiseType::NONE)
     {
         denoisePass = CreateDenoisePass();
     }
@@ -67,6 +68,7 @@ void Renderer::Render(Scene *scene)
 
     FrameGraph fg;
     FrameGraphBlackboard blackboard;
+
     // todo: forward and deferred
     switch (g_Config->lightMode)
     {
@@ -79,16 +81,11 @@ void Renderer::Render(Scene *scene)
     case LightMode::PathTracing: PathTracing(fg, blackboard, scene); break;
     }
 
-    // todo: rendergraph
-    // fg.compile();
-    // fg.execute();
-
     glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
 
     if(g_Config->bRenderdocCapture)
     {
@@ -172,7 +169,7 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     if(g_Config->bVXGI)
     {
         glViewport(0, 0, g_Config->VoxelSize, g_Config->VoxelSize);
-        vxgiPass.AddBuildPass(fg, blackboard, scene);
+        vxgiPass.AddBuildPass(fg, blackboard, scene, renderResource);
         glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
     }
 
@@ -198,7 +195,7 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     postProcessPass.AddPass(fg, blackboard, scene);
 
     // Debug
-    if(g_Config->debugMode != NONEDebug)
+    if(g_Config->debugMode != DebugMode::NONE)
     {
         DebugRendering(fg, blackboard, scene);
     }
@@ -206,14 +203,16 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
 
 void Renderer::DebugRendering(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
+    const auto defaultData = renderResource.get<DefaultData>();
+    defaultData.defaultFBO;
     glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
     switch (g_Config->debugMode)
     {
-    case DebugShadow:
+    case DebugMode::DebugShadow:
         glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
         shadowRenderer.AddPassVisualizeShadowMap(scene);
         break;
-    case DebugVXGI:
+    case DebugMode::DebugVXGI:
         glBindVertexArray(defaultVAO);
         vxgiPass.AddDebugPass(fg, blackboard, scene);
     default:
@@ -225,7 +224,7 @@ void Renderer::DebugRendering(FrameGraph &fg, FrameGraphBlackboard &blackboard, 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
     pathTracingPass.AddPass(fg, blackboard, scene);
-    if(g_Config->curToneMapping > 0)
+    if(g_Config->curToneMapping != ToneMappingType::NONE)
     {
         toneMappingPass.AddPass(fg, blackboard, scene);
     }
@@ -234,4 +233,71 @@ void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Sce
     {
         denoisePass->AddPass(scene);
     }
+}
+
+void Renderer::InitRenderResource()
+{
+    GLuint defaultFBO = generateFBO();
+
+    TextureDesc screenTexDesc{g_Config->wholeWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F,
+                            LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::RGBA, DataType::FLOAT};
+    GPUTexture outputTex0 = generateTexture(screenTexDesc);
+    GPUTexture outputTex1 = generateTexture(screenTexDesc);
+    
+    TextureDesc depthTexDesc{g_Config->wholeWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::DEPTH24_STENCIL8,
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DEPTH_STENCIL, DataType::UNSIGNED_INT_24_8};
+    GPUTexture outputDepthTex = generateTexture(depthTexDesc);
+
+    renderResource.add<DefaultData>(defaultFBO, outputTex0.texId, outputTex1.texId, outputDepthTex.texId);
+
+    if(g_Config->lightMode == LightMode::PathTracing)
+    {
+        GLuint pathTracingFBO = generateFBO();
+
+        GPUTexture pathTracingTex = generateTexture(screenTexDesc);
+        GPUTexture accumTex = generateTexture(screenTexDesc);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTex.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTex.texId, 0);
+        GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, DrawBuffers);
+
+        renderResource.add<PathTracingData>(pathTracingFBO, pathTracingTex.texId, accumTex.texId);
+    }
+    else if(g_Config->lightMode == LightMode::Forward)
+    {
+
+    }
+    else
+    {
+
+
+
+        renderResource.add<GBufferData>();
+    }
+
+    if(g_Config->bShadeShadow)
+    {
+        
+    }
+
+    if(g_Config->bVXGI)
+    {
+        GLuint vxgiFBO = generateFBO();
+
+        TextureDesc desc1{g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize, TextureType1::TEXTURE_3D, TextureFormat::RGBA8,
+                        LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 1};
+        GPUTexture albedo3DTex = generateTexture(desc1);
+        GPUTexture normal3DTex = generateTexture(desc1);
+
+        TextureDesc desc2{g_Config->VoxelSize, g_Config->VoxelSize, g_Config->VoxelSize, TextureType1::TEXTURE_3D, TextureFormat::RGBA8,
+                LINEAR_MIPMAP_LINEAR_LINEAR_CLAMP_TO_BORDER_BLACK_BORDER_SAMPLER, Int(std::log2(g_Config->VoxelSize / 8))};
+        GPUTexture radiance3DTex = generateTexture(desc2);
+
+        renderResource.add<VXGIData>(vxgiFBO, albedo3DTex.texId, normal3DTex.texId, radiance3DTex.texId);
+    }
+
+
+
 }

@@ -1,6 +1,10 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <typeindex>
+#include <any>
+#include <unordered_map>
+
 #include <vec2.hpp>
 #include <mat4x4.hpp>
 #include <glad/glad.h>
@@ -58,6 +62,45 @@ struct EnvMap
     Bool bCubeMap;
 };
 
+class RenderResource
+{
+public:
+    RenderResource() = default;
+    RenderResource(const RenderResource &) = default;
+    RenderResource(RenderResource &&) noexcept = default;
+    ~RenderResource() = default;
+
+    RenderResource &operator=(const RenderResource &) = default;
+    RenderResource &operator=(RenderResource &&) noexcept = default;
+
+    template <typename T, typename... Args>
+    inline T& add(Args &&...args)
+    {
+        return storages[typeid(T)].emplace<T>(T{std::forward<Args>(args)...});
+    }
+
+    template <typename T>
+    inline const T& get() const
+    {
+        return std::any_cast<const T &>(storages.at(typeid(T)));
+    }
+
+    template <typename T> 
+    T& getResource()
+    {
+        return const_cast<T&>(const_cast<const FrameGraphBlackboard *>(this)->get<T>());
+    }
+
+    template <typename T> 
+    Bool hasResource() const
+    {
+        return storages.contains(typeid(T));
+    }
+
+private:
+    std::unordered_map<std::type_index, std::any> storages;
+};
+
 class Scene
 {
     friend class ModelLoader;
@@ -90,9 +133,6 @@ public:
     GLuint pathTracingFBO;
     GLuint pathTracingTexId;
     GLuint accumTexId;
-
-    GLuint toneMappingFBO;
-    GLuint toneMappingTexId;
 
     GLuint deferredBasePassFBO;
     GLuint GBufferTexId[4];

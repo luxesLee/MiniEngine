@@ -29,9 +29,6 @@ set(GLM_INCLUDE_DIR "./External/glm")
 
 set(STB_INCLUDE_DIR "./External/stb")
 
-set(FRAMEGRAPH_INCLUDE_DIR "./External/FrameGraph/include")
-file(GLOB_RECURSE FRAMEGRAPH_SRC "./External/FrameGraph/*.cpp")
-
 set(BVH_INCLUDE_DIR "./External/RadeonRays")
 file(GLOB_RECURSE BVH_SRC_DIR "./External/RadeonRays/*.cpp")
 
@@ -46,6 +43,8 @@ set(JSON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/External/json/nlohmann)
 
 set(RENDERDOC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/renderdoc")
 
+add_subdirectory(External/FrameGraph)
+
 include_directories(
     "./Internal"
     ${GLFW3_INCLUDE_DIR}
@@ -56,7 +55,6 @@ include_directories(
     ${TINYOBJ_INCLUDE_DIR}
     ${ENTT_INCLUDE_DIR}
     ${GLM_INCLUDE_DIR}
-    ${FRAMEGRAPH_INCLUDE_DIR}
     ${BVH_INCLUDE_DIR}
     ${RENDERDOC_DIR}
     ${STB_INCLUDE_DIR}
@@ -72,7 +70,6 @@ add_executable(${TARGET_NAME}
     ${IMGUI_SRC}
     ${TINYGLTF_SRC}
     ${TINYOBJ_SRC}
-    ${FRAMEGRAPH_SRC}
     ${BVH_SRC_DIR}
     )
 
@@ -81,9 +78,11 @@ link_directories(
 )
 
 target_link_libraries(${TARGET_NAME} 
+    PRIVATE
     ${GLFW3_LIB}
     ${OPENGL_LIBRARIES}
     ${OIDN_LIBRARIES}
+    fg::FrameGraph
 )
 
 # output dir

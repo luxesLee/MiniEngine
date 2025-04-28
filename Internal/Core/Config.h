@@ -4,7 +4,7 @@
 #include "glm.hpp"
 #include "Util/Types.h"
 
-enum LightMode
+enum class LightMode
 {
     Forward,
     Deferred,
@@ -13,25 +13,25 @@ enum LightMode
     PathTracing,
 };
 
-enum DenoiseType
+enum class DenoiseType
 {
-    NONEDenoise,
+    NONE,
     SVGF,
     ODIN,
     OPTIX,
 };
 
-enum ToneMappingType
+enum class ToneMappingType
 {
-    NONEToneMapping,
+    NONE,
     Linear,
     ACES,
     TonyMcMapface
 };
 
-enum DebugMode
+enum class DebugMode : Uint32
 {
-    NONEDebug = 1,
+    NONE = 1,
     DebugShadow = (1 << 1),
     DebugVXGI = (1 << 2),
 };
@@ -66,7 +66,7 @@ public:
     LightMode lightMode = LightMode::Deferred;
     Int32 maxRayTracingDepth = 2;
     Uint32 accumulateFrames = 0;
-    DenoiseType curDenoise = DenoiseType::NONEDenoise;
+    DenoiseType curDenoise = DenoiseType::NONE;
     ToneMappingType curToneMapping = ToneMappingType::Linear;
     Uint32 texWidth = 512, texHeight = 512;
 
@@ -94,7 +94,7 @@ public:
     Bool bSSR = true;
 
     // Debug
-    DebugMode debugMode = NONEDebug;
+    DebugMode debugMode = DebugMode::NONE;
 
     // action
     Bool bRenderdocCapture = false;

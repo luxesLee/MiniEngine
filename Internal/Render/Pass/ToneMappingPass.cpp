@@ -23,19 +23,12 @@ void ToneMappingPass::AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, 
         return;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->toneMappingFBO);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, scene->pathTracingTexId);
+    glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
     shaderToneMapping->use();
-    shaderToneMapping->setInt("toneMappingType", g_Config->curToneMapping);
+    shaderToneMapping->setInt("toneMappingType", Int(g_Config->curToneMapping));
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->toneMappingFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene->outputFBO);
-    glBlitFramebuffer(0, 0, g_Config->screenWidth, g_Config->screenHeight, 0, 0, g_Config->screenWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glDispatchCompute(g_Config->wholeWidth / 32, g_Config->screenHeight / 32, 1);
 }
 
 void ToneMappingPass::Init()
