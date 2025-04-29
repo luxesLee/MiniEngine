@@ -31,10 +31,7 @@ void Scene::BuildScene()
 }
 
 void Scene::CleanScene()
-{
-    DeleteFBO();
-    DeleteGPUData();
-    
+{    
     vertices.resize(0);
     indices.resize(0);
     normals.resize(0);
@@ -259,54 +256,12 @@ void Scene::BuildEnvMap()
     if(envMap->bCubeMap)
     {
         envTex = RenderResHelper::generateCubeEnvMap(envMap->envTextures);
-        irradianceEnvTex = RenderResHelper::generateIrradianceMap(envTex);
+        irradianceEnvTex = generateIrradianceMap(envTex);
     }
     else
     {
 
     }
-}
-
-// 暂时这样写，后续用rendergraph
-void Scene::InitFBO()
-{
-// ----------------------------------------------------------------------------
-
-    if(g_Config->lightMode == LightMode::PathTracing)
-    {
-        glGenFramebuffers(1, &pathTracingFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, pathTracingFBO);
-
-        glGenTextures(1, &pathTracingTexId);
-        glBindTexture(GL_TEXTURE_2D, pathTracingTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pathTracingTexId, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        glGenTextures(1, &accumTexId);
-        glBindTexture(GL_TEXTURE_2D, accumTexId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, g_Config->screenWidth, g_Config->screenHeight, 0, GL_RGBA, GL_FLOAT, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, accumTexId, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        GLenum DrawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-        glDrawBuffers(2, DrawBuffers);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-// ----------------------------------------------------------------------------
-
-}
-
-void Scene::DeleteFBO()
-{
-    glDeleteFramebuffers(1, &pathTracingFBO);
-    glDeleteTextures(1, &pathTracingTexId);
-    glDeleteTextures(1, &accumTexId);
 }
 
 void Scene::InitShadowMapFBO()
@@ -316,63 +271,38 @@ void Scene::InitShadowMapFBO()
         return;
     }
 
-    glGenFramebuffers(1, &shadowPassFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowPassFBO);
-
     std::sort(lights.begin(), lights.end(), [&](Light& light1, Light& light2)
     {
         return light1.type < light2.type;
     });
 
-    constexpr Float bordercolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     shadowMapCaches.resize(lights.size());
     for(Int i = 0; i < lights.size(); i++)
     {
         ShadowMapCache& cache = shadowMapCaches[i];
         cache.light = &lights[i];
-
-        glGenTextures(1, &cache.shadowPassDepthTexIds);
         if(lights[i].type == LightType::DIRECTIONAL_LIGHT && g_Config->bCascadeShadow)
         {
             cache.bMultiMats = true;
-            glBindTexture(GL_TEXTURE_2D_ARRAY, cache.shadowPassDepthTexIds);
-            glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 
-                g_Config->cascadeLevel + 1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-            glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, bordercolor);
+ 
+            TextureDesc shadowDepthTexDesc{g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, g_Config->cascadeLevel + 1, TextureType::TEXTURE_2D_ARRAY, TextureFormat::DEPTH_COMPONENT32F,
+                                        NEAREST_CLAMP_TO_EDGE_WHITE_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_DEPTH_COMPONENT, DataType::FLOAT};
+            cache.shadowPassDepthTexIds = (generateTexture(shadowDepthTexDesc)).texId;
         }
         else if(lights[i].type == LightType::POINT_LIGHT)
         {
             cache.bMultiMats = true;
-            glBindTexture(GL_TEXTURE_CUBE_MAP, cache.shadowPassDepthTexIds);
-            for(Int j = 0; j < 6; j++)
-            {
-                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, 
-                    g_Config->shadowDepthHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-            }
-
-            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            TextureDesc shadowDepthTexDesc{g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 0, TextureType::TEXTURE_CUBE_MAP, TextureFormat::DEPTH_COMPONENT32F,
+                                        NEAREST_CLAMP_TO_EDGE_WHITE_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_DEPTH_COMPONENT,  DataType::FLOAT};
+            cache.shadowPassDepthTexIds = (generateTexture(shadowDepthTexDesc)).texId;
         }
         else
         {
             cache.bMultiMats = false;
-            glBindTexture(GL_TEXTURE_2D, cache.shadowPassDepthTexIds);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 
-                0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, bordercolor);
+            TextureDesc shadowDepthTexDesc{g_Config->shadowDepthWidth, g_Config->shadowDepthHeight, 0, TextureType::TEXTURE_2D, TextureFormat::DEPTH_COMPONENT32F,
+                                        NEAREST_CLAMP_TO_EDGE_WHITE_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_DEPTH_COMPONENT,  DataType::FLOAT};
+            cache.shadowPassDepthTexIds = (generateTexture(shadowDepthTexDesc)).texId;
         }
     }
 }
@@ -382,138 +312,63 @@ void Scene::UploadDataToGpu()
     // flag of path tracing
     if(g_Config->lightMode == LightMode::PathTracing)
     {
-        TextureInfo vertTexInfo(TextureType::Buffer, 
-                                vertices.size() * sizeof(vec3), 
-                                vertices.data(), 
-                                GL_RGB32F);
-        verticeTex = RenderResHelper::generateGPUTexture(vertTexInfo);
+        TextureDesc verticeTexDesc{vertices.size() * sizeof(vec3), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+                                NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, vertices.data()};
+        verticeTex = generateTexture(verticeTexDesc);
 
-        TextureInfo indiceTexInfo(TextureType::Buffer,
-                                    indices.size() * sizeof(Indice),
-                                    indices.data(),
-                                    GL_RGB32I);
-        indicesTex = RenderResHelper::generateGPUTexture(indiceTexInfo);
+        TextureDesc indiceTexDesc{indices.size() * sizeof(Indice), 0, 0, TextureType::Buffer, TextureFormat::RGB32I,
+                                NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, indices.data()};
+        indicesTex = generateTexture(indiceTexDesc);
 
-        TextureInfo normalTexInfo(TextureType::Buffer, 
-                                    normals.size() * sizeof(vec3), 
-                                    normals.data(), 
-                                    GL_RGB32F);
-        normalTex = RenderResHelper::generateGPUTexture(normalTexInfo);
+        TextureDesc normalTexDesc{normals.size() * sizeof(vec3), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+                                NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, normals.data()};
+        normalTex = generateTexture(normalTexDesc);
 
-        TextureInfo uvTexInfo(TextureType::Buffer, 
-                                uvs.size() * sizeof(vec2), 
-                                uvs.data(), 
-                                GL_RG32F);
-        uvsTex = RenderResHelper::generateGPUTexture(uvTexInfo);
+        TextureDesc uvTexDesc{uvs.size() * sizeof(vec2), 0, 0, TextureType::Buffer, TextureFormat::RG32F,
+                                NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, uvs.data()};
+        uvsTex = generateTexture(uvTexDesc);
 
-        TextureInfo matTexInfo(TextureType::Image2D, 
-                                    GL_RGBA32F, 
-                                    materials.size() * sizeof(Material) / sizeof(vec4), 
-                                    1, 
-                                    GL_RGBA, 
-                                    GL_FLOAT, 
-                                    materials.data(),
-                                    GL_NEAREST,
-                                    GL_NEAREST);
-        matTex = RenderResHelper::generateGPUTexture(matTexInfo);
-
-        TextureInfo lightTexInfo(TextureType::Buffer,
-                                    lights.size() * sizeof(Light),
-                                    lights.data(),
-                                    GL_RGBA32F);
-        lightTex = RenderResHelper::generateGPUTexture(lightTexInfo);
-
-        TextureInfo transformTexInfo(TextureType::Image2D, 
-                                    GL_RGBA32F, 
-                                    transforms.size() * sizeof(mat4) / sizeof(vec4), 
-                                    1, 
-                                    GL_RGBA, 
-                                    GL_FLOAT, 
-                                    transforms.data(),
-                                    GL_NEAREST,
-                                    GL_NEAREST);
-        instanceTransformTex = RenderResHelper::generateGPUTexture(transformTexInfo);
-
-        TextureInfo bvhTexInfo(TextureType::Buffer, 
-                                bvhTranslator.nodes.size() * sizeof(BvhTranslator::Node), 
-                                bvhTranslator.nodes.data(), 
-                                GL_RGB32F);
-        bvhTex = RenderResHelper::generateGPUTexture(bvhTexInfo);
-
-        TextureInfo textureArrayInfo(TextureType::Image3DTextureArray2D,
-                                        GL_RGBA8,
-                                        g_Config->texWidth,
-                                        g_Config->texHeight,
-                                        textures.size(),
-                                        GL_RGBA,
-                                        GL_UNSIGNED_BYTE,
-                                        textureMapsArray.data(),
-                                        GL_LINEAR,
-                                        GL_LINEAR);
-        textureArrayTex = RenderResHelper::generateGPUTexture(textureArrayInfo);
-    }
-    else
-    {
-        TextureDesc matDesc{materials.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F, 
+        TextureDesc matDesc{materials.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
                             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, materials.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
         matTex = generateTexture(matDesc);
 
-        TextureDesc instanceTransformDesc{transforms.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F, 
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
-        instanceTransformTex = generateTexture(instanceTransformDesc);
-
-        TextureDesc lightDesc{lights.size() * sizeof(Light), 0, 0, TextureType1::Buffer, TextureFormat::RGBA32F,
+        TextureDesc lightDesc{lights.size() * sizeof(Light), 0, 0, TextureType::Buffer, TextureFormat::RGBA32F,
                             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, lights.data()};
         lightTex = generateTexture(lightDesc);
 
-        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType1::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
+        TextureDesc instanceTransformDesc{transforms.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        instanceTransformTex = generateTexture(instanceTransformDesc);
+
+        TextureDesc bvhTexDesc{bvhTranslator.nodes.size() * sizeof(BvhTranslator::Node), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+                                NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, bvhTranslator.nodes.data()};
+        bvhTex = generateTexture(bvhTexDesc);
+
+        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
                             LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
         textureArrayTex = generateTexture(textureArrayDesc);
+    }
+    else
+    {
+        TextureDesc matDesc{materials.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, materials.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        matTex = generateTexture(matDesc);
 
-        TextureInfo LTC1TexInfo(TextureType::Image2D,
-                                    GL_RGBA,
-                                    64,
-                                    64,
-                                    GL_RGBA,
-                                    GL_FLOAT,
-                                    (void*)LTC1,
-                                    GL_NEAREST,
-                                    GL_LINEAR);
-        LTC1Tex = RenderResHelper::generateGPUTexture(LTC1TexInfo);
+        TextureDesc instanceTransformDesc{transforms.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        instanceTransformTex = generateTexture(instanceTransformDesc);
 
-        TextureInfo LTC2TexInfo(TextureType::Image2D,
-                                    GL_RGBA,
-                                    64,
-                                    64,
-                                    GL_RGBA,
-                                    GL_FLOAT,
-                                    (void*)LTC2,
-                                    GL_NEAREST,
-                                    GL_LINEAR);
-        LTC2Tex = RenderResHelper::generateGPUTexture(LTC2TexInfo);
+        TextureDesc lightDesc{lights.size() * sizeof(Light), 0, 0, TextureType::Buffer, TextureFormat::RGBA32F,
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, lights.data()};
+        lightTex = generateTexture(lightDesc);
+
+        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
+                            LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
+        textureArrayTex = generateTexture(textureArrayDesc);
 
         for(auto& meshBatch : meshBatches)
         {
             meshBatch->Build();
         }
     }
-}
-
-void Scene::DeleteGPUData()
-{
-    if(g_Config->lightMode == LightMode::PathTracing)
-    {
-        RenderResHelper::destroyGPUTexture(verticeTex);
-        RenderResHelper::destroyGPUTexture(indicesTex);
-        RenderResHelper::destroyGPUTexture(normalTex);
-        RenderResHelper::destroyGPUTexture(uvsTex);
-        RenderResHelper::destroyGPUTexture(lightTex);
-        RenderResHelper::destroyGPUTexture(matTex);
-        RenderResHelper::destroyGPUTexture(instanceTransformTex);
-        RenderResHelper::destroyGPUTexture(bvhTex);
-        RenderResHelper::destroyGPUTexture(textureArrayTex);
-    }
-
-    RenderResHelper::destroyGPUTexture(envTex);
-    RenderResHelper::destroyGPUTexture(irradianceEnvTex);
 }

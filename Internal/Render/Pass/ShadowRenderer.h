@@ -15,7 +15,7 @@ public:
 
     void InitLightMatrix(Scene* scene);
 
-    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
 
     void AddPassVisualizeShadowMap(Scene* scene);
 

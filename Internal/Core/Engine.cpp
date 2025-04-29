@@ -32,8 +32,6 @@ void Engine::Resize()
     if(g_Camera->bResize)
     {
         renderer->Resize();
-        scene->DeleteFBO();
-        scene->InitFBO();
         g_Camera->bResize = false;
     }
 }
@@ -59,7 +57,6 @@ void Engine::UpdateScene(const SceneConfig& config)
     }
 
     scene->BuildScene();
-    scene->InitFBO();
     scene->InitShadowMapFBO();
     renderer->InitRenderResource();
 }

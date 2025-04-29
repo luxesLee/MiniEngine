@@ -25,6 +25,8 @@ enum class Bordercolor
     BLACK = 0,
     WHITE,
 };
+constexpr Float BLACK_BORDER[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+constexpr Float WHITE_BORDER[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 struct SamplerDesc
 {
     FilterMode filterMin{FilterMode::NEAREST};
@@ -37,12 +39,13 @@ struct SamplerDesc
     Bordercolor borderColor{Bordercolor::BLACK};
 };
 const SamplerDesc NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER = {};
+const SamplerDesc NEAREST_CLAMP_TO_EDGE_WHITE_BORDER_SAMPLER = {FilterMode::NEAREST, FilterMode::NEAREST, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER, Bordercolor::WHITE};
 const SamplerDesc NEAREST_REPEAT_SAMPLER = {FilterMode::NEAREST, FilterMode::NEAREST, WrapMode::REPEAT, WrapMode::REPEAT, WrapMode::REPEAT};
 const SamplerDesc LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER = {FilterMode::LINEAR, FilterMode::LINEAR};
 const SamplerDesc LINEAR_REPEAT_SAMPLER = {FilterMode::LINEAR, FilterMode::LINEAR, WrapMode::REPEAT, WrapMode::REPEAT, WrapMode::REPEAT};
 const SamplerDesc LINEAR_MIPMAP_LINEAR_LINEAR_CLAMP_TO_BORDER_BLACK_BORDER_SAMPLER = {FilterMode::LINEAR_MIPMAP_LINEAR, FilterMode::LINEAR, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER};
 
-enum TextureType1 : Uint
+enum TextureType : Uint
 {
     TEXTURE_2D          = GL_TEXTURE_2D,
     TEXTURE_2D_ARRAY    = GL_TEXTURE_2D_ARRAY,
@@ -54,12 +57,14 @@ enum TextureFormat
 {
     RED = GL_RED,
     RG32F = GL_RG32F,
+    RGB = GL_RGB,
     RGB8 = GL_RGB8,
     RGB32I = GL_RGB32I,
     RGB32F = GL_RGB32F,
     RGBA8 = GL_RGBA8,
     RGBA32F = GL_RGBA32F,
     DEPTH24_STENCIL8 = GL_DEPTH24_STENCIL8,
+    DEPTH_COMPONENT32F = GL_DEPTH_COMPONENT32F,
 };
 enum DataType
 {
@@ -73,13 +78,14 @@ enum DataFormat
     DataFormat_RGB = GL_RGB,
     DataFormat_RGBA = GL_RGBA,
     DataFormat_DEPTH_STENCIL = GL_DEPTH_STENCIL,
+    DataFormat_DEPTH_COMPONENT = GL_DEPTH_COMPONENT,
 };
 struct TextureDesc
 {
     Uint32 width{0};
     Uint32 height{0};
     Uint32 depth{0};
-    TextureType1 type{TextureType1::TEXTURE_2D};
+    TextureType type{TextureType::TEXTURE_2D};
     TextureFormat format{TextureFormat::RGBA8};
     SamplerDesc samplerDesc;
     Uint mipLevel{0};
@@ -107,4 +113,10 @@ struct Texture
     Int32 components;
     std::string texName;
     std::vector<Uint8> data;
+};
+
+struct GPUTexture
+{
+    GLuint texId;
+    GLuint texBufferId;
 };

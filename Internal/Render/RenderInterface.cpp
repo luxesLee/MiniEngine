@@ -1,8 +1,18 @@
-#include "RenderResHelper.h"
+#include "RenderInterface.h"
 #include "ShaderManager.h"
 #include "Core/Shader.h"
 #include "mat4x4.hpp"
 #include "gtc/matrix_transform.hpp"
+#include <iostream>
+
+void checkGLError()
+{
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) 
+    {
+        std::cerr << "OpenGL error: " << error << std::endl;
+    }
+}
 
 GLuint generateFBO()
 {
@@ -27,7 +37,7 @@ GPUTexture generateTexture(const TextureDesc& desc)
 
     switch (desc.type)
     {
-    case TextureType1::Buffer:
+    case TextureType::Buffer:
         {
             glGenBuffers(1, &gpuTex.texBufferId);
             glBindBuffer(GL_TEXTURE_BUFFER, gpuTex.texBufferId);
@@ -35,28 +45,36 @@ GPUTexture generateTexture(const TextureDesc& desc)
             glTexBuffer(GL_TEXTURE_BUFFER, desc.format, gpuTex.texBufferId);
         }
         break;
-    case TextureType1::TEXTURE_2D:
+    case TextureType::TEXTURE_2D:
         glTexImage2D(GL_TEXTURE_2D, desc.mipLevel, desc.format, desc.width, desc.height, 0, desc.dataFormat, desc.dataType, desc.data);
         break;
-    case TextureType1::TEXTURE_2D_ARRAY:
+    case TextureType::TEXTURE_2D_ARRAY:
         glTexImage3D(GL_TEXTURE_2D_ARRAY, desc.mipLevel, desc.format, desc.width, desc.height, desc.depth, 0, desc.dataFormat, desc.dataType, desc.data);
         break;
-    case TextureType1::TEXTURE_3D:
+    case TextureType::TEXTURE_3D:
         glTexStorage3D(GL_TEXTURE_3D, desc.mipLevel, desc.format, desc.width, desc.height, desc.depth);
         break;
-    case TextureType1::TEXTURE_CUBE_MAP:
+    case TextureType::TEXTURE_CUBE_MAP:
+        {
+            for(Int i = 0; i < 6; i++)
+            {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, desc.mipLevel, desc.format, desc.width, desc.height, 0, desc.dataFormat, desc.dataType, desc.data);
+            }
+        }
         break;
     default:
         break;
     }
 
-    if(desc.type != TextureType1::Buffer)
+    if(desc.type != TextureType::Buffer)
     {
         glTexParameteri(desc.type, GL_TEXTURE_WRAP_S, desc.samplerDesc.warpS);
         glTexParameteri(desc.type, GL_TEXTURE_WRAP_T, desc.samplerDesc.warpT);
         glTexParameteri(desc.type, GL_TEXTURE_WRAP_R, desc.samplerDesc.warpR);
         glTexParameteri(desc.type, GL_TEXTURE_MAG_FILTER, desc.samplerDesc.filterMag);
         glTexParameteri(desc.type, GL_TEXTURE_MIN_FILTER, desc.samplerDesc.filterMin);
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, (desc.samplerDesc.borderColor == Bordercolor::BLACK 
+                        ? BLACK_BORDER : WHITE_BORDER));
     }
 
     glBindTexture(desc.type, 0);
@@ -85,49 +103,6 @@ GLuint generateVAO()
 void deleteVAO(GLuint VAO)
 {
     glDeleteVertexArrays(1, &VAO);
-}
-
-GPUTexture RenderResHelper::generateGPUTexture(TextureInfo &textureInfo)
-{
-    GPUTexture gpuTexture;
-    glGenTextures(1, &gpuTexture.texId);
-    if(textureInfo.texType == TextureType::Buffer)
-    {
-        glGenBuffers(1, &gpuTexture.texBufferId);
-        glBindBuffer(GL_TEXTURE_BUFFER, gpuTexture.texBufferId);
-        glBufferData(GL_TEXTURE_BUFFER, textureInfo.dataSize, textureInfo.data, GL_STATIC_DRAW);
-        glBindTexture(GL_TEXTURE_BUFFER, gpuTexture.texId);
-        glTexBuffer(GL_TEXTURE_BUFFER, textureInfo.internalFormat, gpuTexture.texBufferId);
-    }
-    else if(textureInfo.texType == TextureType::Image2D)
-    {
-        glBindTexture(GL_TEXTURE_2D, gpuTexture.texId);
-        glTexImage2D(GL_TEXTURE_2D, 0, textureInfo.internalFormat, textureInfo.width, textureInfo.height, 0, textureInfo.format, textureInfo.type, textureInfo.data);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, textureInfo.magFilter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, textureInfo.minFilter);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    else if(textureInfo.texType == TextureType::Image3DTextureArray2D)
-    {
-        glBindTexture(GL_TEXTURE_2D_ARRAY, gpuTexture.texId);
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, textureInfo.internalFormat, textureInfo.width, textureInfo.height, textureInfo.dataSize, 0, textureInfo.format, textureInfo.type, textureInfo.data);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, textureInfo.magFilter);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, textureInfo.minFilter);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-    }
-    return gpuTexture;
-}
-
-void RenderResHelper::destroyGPUTexture(GPUTexture &gpuTexture)
-{
-    if(gpuTexture.texId != 0)
-    {
-        glDeleteTextures(1, &gpuTexture.texId);
-    }
-    if(gpuTexture.texBufferId != 0)
-    {
-        glDeleteBuffers(1, &gpuTexture.texBufferId);
-    }
 }
 
 unsigned int cubeVAO = 0;
@@ -220,24 +195,14 @@ GPUTexture RenderResHelper::generateCubeEnvMap(const std::vector<Texture> &envMa
     return gpuTexture;
 }
 
-GPUTexture RenderResHelper::generateIrradianceMap(const GPUTexture& gpuTex)
+GPUTexture generateIrradianceMap(const GPUTexture& gpuTex)
 {
-    GLuint fboTmp;
-    glGenFramebuffers(1, &fboTmp);
+    GLuint fboTmp = generateFBO();
     glBindFramebuffer(GL_FRAMEBUFFER, fboTmp);
 
-    GPUTexture irradianceTex;
-    glGenTextures(1, &irradianceTex.texId);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceTex.texId);
-    for(Int i = 0; i < 6; i++)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, 32, 32, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    TextureDesc irraDesc{32, 32, 0, TextureType::TEXTURE_CUBE_MAP, TextureFormat::RGB, 
+                        LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_RGB, DataType::UNSIGNED_BYTE};
+    GPUTexture irradianceTex = generateTexture(irraDesc);
 
     static glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     static glm::mat4 captureViews[] =
@@ -269,16 +234,9 @@ GPUTexture RenderResHelper::generateIrradianceMap(const GPUTexture& gpuTex)
 
         renderCube();
     }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    deleteFBO(fboTmp);
+
     return irradianceTex;
 }
-
-void checkGLError()
-{
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) 
-    {
-        std::cerr << "OpenGL error: " << error << std::endl;
-    }
-}
-

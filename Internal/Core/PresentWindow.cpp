@@ -6,7 +6,7 @@
 #include "Camera.h"
 #include "Util/Timer.h"
 #include "Config.h"
-#include "Render/RenderResHelper.h"
+#include "Render/RenderInterface.h"
 
 PresentWindow::PresentWindow(uint16_t width, uint16_t height, std::string title)
     : curWidth(width), curHeight(height), bResize(false)

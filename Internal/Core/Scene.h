@@ -10,9 +10,10 @@
 #include <glad/glad.h>
 #include "Material.h"
 #include "Mesh.h"
-#include "Texture.h"
+
 #include "Light.h"
-#include "Render/RenderResHelper.h"
+#include "Render/RenderInterface.h"
+#include "Render/Texture.h"
 #include <bvh.h>
 #include <bvh_translator.h>
 
@@ -120,27 +121,15 @@ public:
     void BuildScene();
     void CleanScene();
 
-    void InitFBO();
-    void DeleteFBO();
-
     void InitShadowMapFBO();
     RadeonRays::bbox GetSceneBoundingBox() {return sceneBvh->Bounds();}
 
     int curOutputTex;
 
-    GLuint pathTracingFBO;
-    GLuint pathTracingTexId;
-    GLuint accumTexId;
-
-    GLuint shadowPassFBO;
     std::vector<ShadowMapCache> shadowMapCaches;
-
-    GPUTexture LTC1Tex;
-    GPUTexture LTC2Tex;
 
 private:
     void UploadDataToGpu();
-    void DeleteGPUData();
 
 public:
     int getTopBVHIndex() const 

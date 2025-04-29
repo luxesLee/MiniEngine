@@ -25,25 +25,29 @@ public:
         }
     }
 
-    void Update(Scene* scene);
-    void Render(Scene* scene);
     void Resize();
 
     void InitRenderResource();
-
     void DeleteRenderResource();
 
 private:
+    void InitDefaultResourceData();
+    void InitDeferredRenderingResourceData();
+    void InitPathTracingRenderingResourceData();
+    void InitShadowMapRenderingResourceData();
+    void InitSSAORenderingResourceData();
+    void InitVXGIRenderingResourceData();
+
+public:
+    void Update(Scene* scene);
+    void Render(Scene* scene);
+
+private:
     void UpdateUBO(Scene* scene);
-    
     void DoCulling();
-
     void ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    
     void DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-    
     void DebugRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
-
     void PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
 
 // -------------------------------------------------------------------------------------------

@@ -15,7 +15,4 @@ public:
 
     void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
     void Init();
-
-private:
-    GLuint vao;
 };

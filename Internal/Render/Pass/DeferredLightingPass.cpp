@@ -30,10 +30,7 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
     glBindTexture(GL_TEXTURE_2D, gBufferData.gBufferDepthStencil);
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_BUFFER, scene->getLightTexId());
-    glActiveTexture(GL_TEXTURE6);
-    glBindTexture(GL_TEXTURE_2D, scene->LTC1Tex.texId);
-    glActiveTexture(GL_TEXTURE7);
-    glBindTexture(GL_TEXTURE_2D, scene->LTC2Tex.texId);
+
     glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_CUBE_MAP, scene->getIrradianceEnvTexId());
 

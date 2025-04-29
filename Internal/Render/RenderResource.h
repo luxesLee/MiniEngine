@@ -27,6 +27,7 @@ struct LightData
 
 struct ShadowMapData
 {
+    RenderResourceHandle shadowPassFBO;
 
 };
 
@@ -51,8 +52,6 @@ struct VXGIData
     RenderResourceHandle radianceData;
 };
 
-// PathTracing
-// ---------------------------------------------------------
 struct PathTracingData
 {
     RenderResourceHandle pathTracingFBO;

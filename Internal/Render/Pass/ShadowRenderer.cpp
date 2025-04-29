@@ -1,5 +1,6 @@
 #include "ShadowRenderer.h"
 #include "Render/ShaderManager.h"
+#include "Render/RenderResource.h"
 #include "Core/Shader.h"
 #include "Core/Camera.h"
 #include "fg/FrameGraph.hpp"
@@ -9,12 +10,14 @@ void ShadowRenderer::InitLightMatrix(Scene *scene)
 {
 }
 
-void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
+    const auto shadowPassData = renderResource.get<ShadowMapData>();
+
     Shader* shaderShadowDepth = nullptr;
     auto meshBatch = scene->GetMeshBatches();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->shadowPassFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowPassData.shadowPassFBO);
     glClearDepth(1.0);
     glDepthFunc(GL_LEQUAL);
     glCullFace(GL_FRONT);  // peter panning

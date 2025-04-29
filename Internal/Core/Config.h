@@ -53,8 +53,8 @@ public:
     std::string title = "MiniEngine";
 
     // sceneConfigPath
-    std::string configPath = "../../Resource/newsponza.json";
-    // std::string configPath = "../../Resource/Cornell_box_Point_Light.json";
+    // std::string configPath = "../../Resource/newsponza.json";
+    std::string configPath = "../../Resource/Cornell_box_Point_Light.json";
 
     // camera
     Float cameraMoveSpeed = 20.0f;
@@ -63,7 +63,7 @@ public:
     Float cameraZFar = 0.1f;
 
     // render
-    LightMode lightMode = LightMode::PathTracing;
+    LightMode lightMode = LightMode::Deferred;
     Int32 maxRayTracingDepth = 2;
     Uint32 accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;

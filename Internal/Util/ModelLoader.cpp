@@ -11,7 +11,7 @@
 #include "ModelLoader.h"
 #include "Core/Scene.h"
 #include "Core/Mesh.h"
-#include "Core/Texture.h"
+#include "Render/Texture.h"
 #include "Core/Image.h"
 
 void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
