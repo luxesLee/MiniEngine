@@ -2,15 +2,17 @@
 #include "Render/ShaderManager.h"
 #include "Core/Config.h"
 #include "Core/Shader.h"
-#include "Core/Scene.h"
+#include "Render/RenderResource.h"
 
 #include "fg/FrameGraph.hpp"
 #include "fg/Blackboard.hpp"
 #include "Render/RenderResource.h"
 
-void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->deferredBasePassFBO);
+    const auto gBufferData = renderResource.get<GBufferData>();
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferData.gBufferFBO);
+
     Shader* shaderBasePass = g_ShaderManager.GetShader("BasePass");
     if(!shaderBasePass)
     {

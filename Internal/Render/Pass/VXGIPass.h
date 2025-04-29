@@ -33,9 +33,16 @@ private:
 
 private:
     GLuint voxelSceneFBO;
+
     GLuint albedo3DTexId;
     GLuint normal3DTexId;
     GLuint radiance3DTexId;
+
+    GLuint curOutputTexId;
+
+    GLuint screenVAO;
+
+    GLuint gBufferTexId[4];
 
     glm::mat4 projMat;
 };

@@ -37,6 +37,7 @@ struct SamplerDesc
     Bordercolor borderColor{Bordercolor::BLACK};
 };
 const SamplerDesc NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER = {};
+const SamplerDesc NEAREST_REPEAT_SAMPLER = {FilterMode::NEAREST, FilterMode::NEAREST, WrapMode::REPEAT, WrapMode::REPEAT, WrapMode::REPEAT};
 const SamplerDesc LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER = {FilterMode::LINEAR, FilterMode::LINEAR};
 const SamplerDesc LINEAR_REPEAT_SAMPLER = {FilterMode::LINEAR, FilterMode::LINEAR, WrapMode::REPEAT, WrapMode::REPEAT, WrapMode::REPEAT};
 const SamplerDesc LINEAR_MIPMAP_LINEAR_LINEAR_CLAMP_TO_BORDER_BLACK_BORDER_SAMPLER = {FilterMode::LINEAR_MIPMAP_LINEAR, FilterMode::LINEAR, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER, WrapMode::CLAMP_TO_BORDER};
@@ -51,6 +52,7 @@ enum TextureType1 : Uint
 };
 enum TextureFormat
 {
+    RED = GL_RED,
     RG32F = GL_RG32F,
     RGB8 = GL_RGB8,
     RGB32I = GL_RGB32I,
@@ -67,8 +69,10 @@ enum DataType
 };
 enum DataFormat
 {
-    RGBA = GL_RGBA,
-    DEPTH_STENCIL = GL_DEPTH_STENCIL,
+    DataFormat_RED = GL_RED,
+    DataFormat_RGB = GL_RGB,
+    DataFormat_RGBA = GL_RGBA,
+    DataFormat_DEPTH_STENCIL = GL_DEPTH_STENCIL,
 };
 struct TextureDesc
 {
@@ -81,7 +85,7 @@ struct TextureDesc
     Uint mipLevel{0};
 
     void* data{nullptr};
-    DataFormat dataFormat{RGBA};
+    DataFormat dataFormat{DataFormat::DataFormat_RGBA};
     DataType dataType{DataType::UNSIGNED_BYTE};
 };
 

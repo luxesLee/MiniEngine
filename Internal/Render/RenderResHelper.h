@@ -53,12 +53,14 @@ struct GPUTexture
 void checkGLError();
 
 GLuint generateFBO();
-
 void deleteFBO(GLuint fboId);
 
 GPUTexture generateTexture(const TextureDesc& desc);
-
 void deleteTexture(GPUTexture tex);
+
+GLuint generateVAO();
+void deleteVAO(GLuint VAO);
+
 
 class RenderResHelper
 {

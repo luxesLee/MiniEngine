@@ -1,5 +1,5 @@
 #include "IDenoisePass.h"
-#include "Core/Scene.h"
+#include "Render/RenderResource.h"
 #include "Core/Config.h"
 #include <iostream>
 #include "Util/Timer.h"
@@ -9,7 +9,7 @@ SVGFDenoisePass::SVGFDenoisePass()
 
 }
 
-void SVGFDenoisePass::AddPass(Scene *scene)
+void SVGFDenoisePass::AddPass(Scene *scene, RenderResource& renderResource)
 {
 
 }
@@ -29,10 +29,13 @@ OIDNDenoisePass::~OIDNDenoisePass()
 
 }
 
-void OIDNDenoisePass::AddPass(Scene *scene)
+void OIDNDenoisePass::AddPass(Scene *scene, RenderResource& renderResource)
 {
     // 回读前一帧输出
-    glBindTexture(GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex]);
+    const auto defaultData = renderResource.get<DefaultData>();
+    GLuint curOutputTexId = defaultData.defaultColorData[1 - scene->curOutputTex];
+
+    glBindTexture(GL_TEXTURE_2D, curOutputTexId);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, inputFrameVec.data());
 
     filter.setImage("color", inputFrameVec.data(), oidn::Format::Float3, g_Config->wholeWidth, g_Config->screenHeight);
@@ -49,7 +52,7 @@ void OIDNDenoisePass::AddPass(Scene *scene)
         std::cout << "Error2: " << errorMessage << std::endl;
     }
 
-    glBindTexture(GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex]);
+    glBindTexture(GL_TEXTURE_2D, curOutputTexId);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, g_Config->wholeWidth, g_Config->screenHeight, 0, GL_RGB, GL_FLOAT, outputFrameVec.data());
 }
 

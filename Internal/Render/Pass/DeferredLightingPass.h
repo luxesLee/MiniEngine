@@ -1,8 +1,8 @@
 #pragma once
+#include "Core/Scene.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
-class Scene;
 
 class DeferredLightingPass
 {
@@ -10,5 +10,5 @@ public:
     DeferredLightingPass() {}
     ~DeferredLightingPass() {}
     
-    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
 };

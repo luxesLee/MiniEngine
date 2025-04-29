@@ -126,17 +126,11 @@ public:
     void InitShadowMapFBO();
     RadeonRays::bbox GetSceneBoundingBox() {return sceneBvh->Bounds();}
 
-    GLuint outputFBO;
-    GLuint outputTex[2];
     int curOutputTex;
 
     GLuint pathTracingFBO;
     GLuint pathTracingTexId;
     GLuint accumTexId;
-
-    GLuint deferredBasePassFBO;
-    GLuint GBufferTexId[4];
-    GLuint basePassDepthStencilTexId;
 
     GLuint shadowPassFBO;
     std::vector<ShadowMapCache> shadowMapCaches;

@@ -63,7 +63,7 @@ public:
     Float cameraZFar = 0.1f;
 
     // render
-    LightMode lightMode = LightMode::Deferred;
+    LightMode lightMode = LightMode::PathTracing;
     Int32 maxRayTracingDepth = 2;
     Uint32 accumulateFrames = 0;
     DenoiseType curDenoise = DenoiseType::NONE;

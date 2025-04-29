@@ -3,7 +3,7 @@
 #include "PathTracingPass.h"
 #include "Render/ShaderManager.h"
 #include "Render/RenderResHelper.h"
-#include "Core/Scene.h"
+#include "Render/RenderResource.h"
 #include "Core/Shader.h"
 #include "Core/Config.h"
 
@@ -20,14 +20,18 @@ PathTracingPass::~PathTracingPass()
 
 }
 
-void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, Scene* scene)
+void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource)
 {
+    const auto pathTracingData = renderResource.get<PathTracingData>();
+    const auto defaultData = renderResource.get<DefaultData>();
+
     Shader* shaderPathTracing = g_ShaderManager.GetShader("PathTracing");
     if(!shaderPathTracing)
     {
         return;
     }
 
+    glBindVertexArray(defaultData.defaultVAO);
     glBindFramebuffer(GL_FRAMEBUFFER, scene->pathTracingFBO);
 
     if(g_Config->accumulateFrames == 1)
@@ -63,10 +67,8 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
     shaderPathTracing->use();
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
-    checkGLError();
-
     glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->pathTracingFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, scene->outputFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, defaultData.defaultFBO);
     glReadBuffer(GL_COLOR_ATTACHMENT0);
     glBlitFramebuffer(0, 0, g_Config->screenWidth, g_Config->screenHeight, 0, 0, g_Config->screenWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }

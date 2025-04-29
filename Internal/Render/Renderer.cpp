@@ -7,6 +7,7 @@
 #include <fg/FrameGraph.hpp>
 #include <fg/Blackboard.hpp>
 #include "RenderResource.h"
+#include <random>
 
 Renderer::Renderer()
 {
@@ -26,9 +27,6 @@ Renderer::Renderer()
     glBindBufferBase(GL_UNIFORM_BUFFER, 1, PathTracingUBO);
     glBindBuffer(GL_UNIFORM_BUFFER, PathTracingUBO);
     glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(int), NULL, GL_DYNAMIC_DRAW);
-
-    glGenVertexArrays(1, &defaultVAO);
-    glBindVertexArray(defaultVAO);
 }
 
 void Renderer::Update(Scene* scene)
@@ -62,9 +60,10 @@ void Renderer::Render(Scene *scene)
     //     glClear(GL_COLOR_BUFFER_BIT);
     // }
 
+    const auto defaultData = renderResource.get<DefaultData>();
     scene->curOutputTex = 1 - scene->curOutputTex;
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[scene->curOutputTex], 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultData.defaultFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, defaultData.defaultColorData[scene->curOutputTex], 0);
 
     FrameGraph fg;
     FrameGraphBlackboard blackboard;
@@ -81,9 +80,9 @@ void Renderer::Render(Scene *scene)
     case LightMode::PathTracing: PathTracing(fg, blackboard, scene); break;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, scene->outputTex[1 - scene->curOutputTex], 0);
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, scene->outputFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultData.defaultFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, defaultData.defaultColorData[1 - scene->curOutputTex], 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, defaultData.defaultFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, g_Config->wholeWidth, g_Config->screenHeight, 0, 0, g_Config->wholeWidth, g_Config->screenHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
@@ -150,11 +149,11 @@ void Renderer::ForwardRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard
 void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
     // BasePass
-    basePass.AddPass(fg, blackboard, scene);
+    basePass.AddPass(fg, blackboard, scene, renderResource);
 
     if(g_Config->bSSAO)
     {
-        aoRenderer.AddPass(fg, blackboard, scene);
+        aoRenderer.AddPass(fg, blackboard, scene, renderResource);
     }
 
     // ShadowMap
@@ -176,7 +175,7 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
     // Direct Lighting
     switch (g_Config->lightMode)
     {
-    case LightMode::Deferred: deferredLightingPass.AddPass(fg, blackboard, scene); break;
+    case LightMode::Deferred: deferredLightingPass.AddPass(fg, blackboard, scene, renderResource); break;
     case LightMode::TiledDeferred: break;
     case LightMode::ClusterDeferred: break;
     }
@@ -204,34 +203,35 @@ void Renderer::DeferredRendering(FrameGraph& fg, FrameGraphBlackboard& blackboar
 void Renderer::DebugRendering(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
     const auto defaultData = renderResource.get<DefaultData>();
-    defaultData.defaultFBO;
-    glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultData.defaultFBO);
+
     switch (g_Config->debugMode)
     {
     case DebugMode::DebugShadow:
-        glBindFramebuffer(GL_FRAMEBUFFER, scene->outputFBO);
         shadowRenderer.AddPassVisualizeShadowMap(scene);
         break;
     case DebugMode::DebugVXGI:
-        glBindVertexArray(defaultVAO);
+        glBindVertexArray(defaultData.defaultVAO);
         vxgiPass.AddDebugPass(fg, blackboard, scene);
     default:
         break;
     }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::PathTracing(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene)
 {
-    pathTracingPass.AddPass(fg, blackboard, scene);
+    glViewport(0, 0, g_Config->screenWidth, g_Config->screenHeight);
+    pathTracingPass.AddPass(fg, blackboard, scene, renderResource);
     if(g_Config->curToneMapping != ToneMappingType::NONE)
     {
-        toneMappingPass.AddPass(fg, blackboard, scene);
+        toneMappingPass.AddPass(fg, blackboard, scene, renderResource);
     }
 
     if(denoisePass)
     {
-        denoisePass->AddPass(scene);
+        denoisePass->AddPass(scene, renderResource);
     }
 }
 
@@ -240,15 +240,17 @@ void Renderer::InitRenderResource()
     GLuint defaultFBO = generateFBO();
 
     TextureDesc screenTexDesc{g_Config->wholeWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F,
-                            LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::RGBA, DataType::FLOAT};
+                            LINEAR_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_RGBA, DataType::FLOAT};
     GPUTexture outputTex0 = generateTexture(screenTexDesc);
     GPUTexture outputTex1 = generateTexture(screenTexDesc);
     
     TextureDesc depthTexDesc{g_Config->wholeWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::DEPTH24_STENCIL8,
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DEPTH_STENCIL, DataType::UNSIGNED_INT_24_8};
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_DEPTH_STENCIL, DataType::UNSIGNED_INT_24_8};
     GPUTexture outputDepthTex = generateTexture(depthTexDesc);
 
-    renderResource.add<DefaultData>(defaultFBO, outputTex0.texId, outputTex1.texId, outputDepthTex.texId);
+    GLuint defaultVAO = generateVAO();
+
+    renderResource.add<DefaultData>(defaultFBO, outputTex0.texId, outputTex1.texId, outputDepthTex.texId, defaultVAO);
 
     if(g_Config->lightMode == LightMode::PathTracing)
     {
@@ -271,15 +273,65 @@ void Renderer::InitRenderResource()
     }
     else
     {
+        GLuint gBufferFBO = generateFBO();
 
+        TextureDesc gBufferTexDesc{g_Config->screenWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F,
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        GPUTexture gBufferTex0 = generateTexture(gBufferTexDesc);
+        GPUTexture gBufferTex1 = generateTexture(gBufferTexDesc);
+        GPUTexture gBufferTex2 = generateTexture(gBufferTexDesc);
+        GPUTexture gBufferTex3 = generateTexture(gBufferTexDesc);
+        GPUTexture gBufferTex4 = generateTexture(gBufferTexDesc);
 
+        TextureDesc depthTexDesc{g_Config->screenWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::DEPTH24_STENCIL8,
+                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, nullptr, DataFormat::DataFormat_DEPTH_STENCIL, DataType::UNSIGNED_INT_24_8};
+        GPUTexture gBufferDepthTex = generateTexture(depthTexDesc);
 
-        renderResource.add<GBufferData>();
+        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gBufferTex0.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gBufferTex1.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gBufferTex2.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, gBufferTex3.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, gBufferTex4.texId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, gBufferDepthTex.texId, 0);
+
+        GLenum DrawBuffers[5] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4};
+        glDrawBuffers(5, DrawBuffers);
+
+        renderResource.add<GBufferData>(gBufferFBO, gBufferTex0.texId, gBufferTex1.texId, gBufferTex2.texId, 
+                                        gBufferTex3.texId, gBufferTex4.texId, gBufferDepthTex.texId);
     }
 
     if(g_Config->bShadeShadow)
     {
         
+    }
+
+    if(g_Config->bSSAO)
+    {
+        GLuint ssaoFBO = generateFBO();
+        GLuint ssaoBlurFBO = generateFBO();
+
+        std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0);
+        std::default_random_engine generator;
+        std::vector<glm::vec3> ssaoNoise;
+        for (unsigned int i = 0; i < 16; i++)
+        {
+            glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f);
+            ssaoNoise.push_back(noise);
+        }
+        TextureDesc ssaoNoisyTexDesc{4, 4, 0, TextureType1::TEXTURE_2D, TextureFormat::RGBA32F, 
+                                    NEAREST_REPEAT_SAMPLER, 0, ssaoNoise.data(), DataFormat::DataFormat_RGB, DataType::FLOAT};
+        GPUTexture ssaoNoisyTex = generateTexture(ssaoNoisyTexDesc);
+                
+        TextureDesc ssaoInterMediateTexDesc{g_Config->screenWidth, g_Config->screenHeight, 0, TextureType1::TEXTURE_2D, TextureFormat::RED,
+                                        NEAREST_REPEAT_SAMPLER, 0, nullptr, DataFormat::DataFormat_RED, DataType::FLOAT};
+        GPUTexture ssaoInterMediateTex = generateTexture(ssaoInterMediateTexDesc);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoInterMediateTex.texId, 0);
+
+        renderResource.add<SSAOData>(ssaoFBO, ssaoBlurFBO, ssaoNoisyTex.texId, ssaoInterMediateTex.texId);
     }
 
     if(g_Config->bVXGI)

@@ -26,6 +26,15 @@ void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sc
     normal3DTexId = vxgiData.normalData;
     radiance3DTexId = vxgiData.radianceData;
 
+    const auto defaultData = renderResource.get<DefaultData>();
+    curOutputTexId = defaultData.defaultColorData[scene->curOutputTex];
+
+    const auto gBufferData = renderResource.get<GBufferData>();
+    gBufferTexId[0] = gBufferData.gBuffer0;
+    gBufferTexId[1] = gBufferData.gBuffer1;
+    gBufferTexId[2] = gBufferData.gBuffer2;
+    gBufferTexId[3] = gBufferData.gBuffer3;
+
     AddVoxelSceneBuildPass(fg, blackboard, scene);
     AddLightInjectPass(fg, blackboard, scene);
     AddGenerateMipmapPass(fg, blackboard, scene);
@@ -39,16 +48,16 @@ void VXGIPass::AddIndirectLightingPass(FrameGraph& fg, FrameGraphBlackboard& bla
         return;
     }
 
-    glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(0, curOutputTexId, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[0]);
+    glBindTexture(GL_TEXTURE_2D, gBufferTexId[0]);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[1]);
+    glBindTexture(GL_TEXTURE_2D, gBufferTexId[1]);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[2]);
+    glBindTexture(GL_TEXTURE_2D, gBufferTexId[2]);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[3]);
+    glBindTexture(GL_TEXTURE_2D, gBufferTexId[3]);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_3D, radiance3DTexId);
 
@@ -73,7 +82,7 @@ void VXGIPass::AddIndirectLightingPass(FrameGraph& fg, FrameGraphBlackboard& bla
 
 void VXGIPass::AddDebugPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
 {
-    // FBO VAO 已在外层绑定
+    // FBO 已在外层绑定
     Shader* shaderVisualizeVoxel = g_ShaderManager.GetShader("VisualizeVoxel");
     if(!shaderVisualizeVoxel)
     {

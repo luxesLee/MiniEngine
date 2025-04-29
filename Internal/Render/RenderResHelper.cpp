@@ -75,6 +75,18 @@ void deleteTexture(GPUTexture tex)
     }
 }
 
+GLuint generateVAO()
+{
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    return vao;
+}
+
+void deleteVAO(GLuint VAO)
+{
+    glDeleteVertexArrays(1, &VAO);
+}
+
 GPUTexture RenderResHelper::generateGPUTexture(TextureInfo &textureInfo)
 {
     GPUTexture gpuTexture;

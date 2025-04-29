@@ -1,8 +1,8 @@
 #pragma once
+#include "Core/Scene.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
-class Scene;
 
 class GBufferPass
 {
@@ -14,7 +14,7 @@ public:
     {
     }
 
-    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
     void Init();
 
 private:

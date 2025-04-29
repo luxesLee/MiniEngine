@@ -23,7 +23,6 @@ public:
         {
             delete denoisePass;
         }
-        glDeleteBuffers(1, &defaultVAO);
     }
 
     void Update(Scene* scene);
@@ -64,6 +63,4 @@ private:
 
     GLuint CommonUBO;
     GLuint PathTracingUBO;
-
-    GLuint defaultVAO;
 };

@@ -2,12 +2,12 @@
 #include "Render/ShaderManager.h"
 #include "Core/Config.h"
 #include "Core/Shader.h"
-#include "Core/Scene.h"
+#include "Render/RenderResource.h"
 
 #include "fg/FrameGraph.hpp"
 #include "fg/Blackboard.hpp"
 
-void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene)
+void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
     Shader* shaderDeferredLighting = g_ShaderManager.GetShader("DeferredLighting");
     if(!shaderDeferredLighting)
@@ -15,17 +15,19 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
         return;
     }
 
+    const auto gBufferData = renderResource.get<GBufferData>();
+
     // 输入
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[0]);
+    glBindTexture(GL_TEXTURE_2D, gBufferData.gBuffer0);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[1]);
+    glBindTexture(GL_TEXTURE_2D, gBufferData.gBuffer1);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[2]);
+    glBindTexture(GL_TEXTURE_2D, gBufferData.gBuffer2);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, scene->GBufferTexId[3]);
+    glBindTexture(GL_TEXTURE_2D, gBufferData.gBuffer3);
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, scene->basePassDepthStencilTexId);
+    glBindTexture(GL_TEXTURE_2D, gBufferData.gBufferDepthStencil);
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_BUFFER, scene->getLightTexId());
     glActiveTexture(GL_TEXTURE6);
@@ -36,7 +38,9 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
     glBindTexture(GL_TEXTURE_CUBE_MAP, scene->getIrradianceEnvTexId());
 
     // 输出
-    glBindImageTexture(0, scene->outputTex[scene->curOutputTex], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    const auto defaultData = renderResource.get<DefaultData>();
+    GLuint curOutputTexId = defaultData.defaultColorData[scene->curOutputTex];
+    glBindImageTexture(0, curOutputTexId, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
     // Uniform
     shaderDeferredLighting->use();

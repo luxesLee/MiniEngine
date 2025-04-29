@@ -62,16 +62,17 @@ void main()
 {
     ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
     vec4 color = imageLoad(outputImg, uv);
+    vec4 result = vec4(0);
     switch(toneMappingType)
     {
     case Linear:
-        color = vec4(LinearToneMapping(color.rgb), 1.0f);
-        return;
+        result = vec4(LinearToneMapping(color.rgb), 1.0f);
+        break;
     case ACES:
-        color = vec4(ACESFilmicToneMapping(color.rgb), 1.0f);
-        return;
+        result = vec4(ACESFilmicToneMapping(color.rgb), 1.0f);
+        break;
     case TonyMcMapface:
-        return;
+        break;
     }
-    imageStore(outputImg, uv, vec4(color));
+    imageStore(outputImg, uv, result);
 }

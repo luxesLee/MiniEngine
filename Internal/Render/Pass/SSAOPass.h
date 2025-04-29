@@ -2,10 +2,10 @@
 #include "glad/glad.h"
 #include "vec3.hpp"
 #include <vector>
+#include "Core/Scene.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
-class Scene;
 
 class SSAOPass
 {
@@ -14,7 +14,7 @@ public:
     
     ~SSAOPass();
 
-    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
 
 private:
     void AddSSAOPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
@@ -27,4 +27,6 @@ private:
     GLuint ssaoIntermediateTexId;
     std::vector<glm::vec3> ssaoKernel;
     GLuint vao;
+
+    GLuint gBufferTexId[4];
 };

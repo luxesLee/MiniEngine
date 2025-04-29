@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "glad/glad.h"
+#include "Core/Scene.h"
 
 class FrameGraph;
 class FrameGraphBlackboard;
@@ -12,6 +13,6 @@ public:
     ToneMappingPass();
     ~ToneMappingPass();
 
-    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene);
+    void AddPass(FrameGraph& fg, FrameGraphBlackboard& blackboard, Scene* scene, RenderResource& renderResource);
     void Init();
 };

@@ -7,6 +7,7 @@ struct DefaultData
     RenderResourceHandle defaultFBO;
     RenderResourceHandle defaultColorData[2];
     RenderResourceHandle defaultDepthData;
+    RenderResourceHandle defaultVAO;
 };
 
 struct GBufferData{
@@ -15,6 +16,7 @@ struct GBufferData{
     RenderResourceHandle gBuffer1;
     RenderResourceHandle gBuffer2;
     RenderResourceHandle gBuffer3;
+    RenderResourceHandle gBuffer4;  
     RenderResourceHandle gBufferDepthStencil;
 };
 
@@ -31,6 +33,14 @@ struct ShadowMapData
 struct IrradianceEnvData
 {
     RenderResourceHandle envData;
+};
+
+struct SSAOData
+{
+    RenderResourceHandle ssaoFBO;
+    RenderResourceHandle ssaoBlurFBO;
+    RenderResourceHandle ssaoNoiseTexData;
+    RenderResourceHandle ssaoIntermediateTexData;
 };
 
 struct VXGIData
