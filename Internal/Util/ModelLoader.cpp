@@ -109,10 +109,11 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
 
         Material material;
         entt::entity entity = reg.create();
+        Int curTexSize = reg.view<Texture*>().size();
 
         material.baseColor = Vec3((float)pbr.baseColorFactor[0], (float)pbr.baseColorFactor[1], (float)pbr.baseColorFactor[2]);
         if (pbr.baseColorTexture.index > -1)
-            material.baseColorTexId = (float)pbr.baseColorTexture.index + scene->textures.size();
+            material.baseColorTexId = (float)pbr.baseColorTexture.index + curTexSize;
         
         material.opacity = (float)pbr.baseColorFactor[3];
 
@@ -121,13 +122,13 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
         material.roughness = sqrtf((float)pbr.roughnessFactor);
         material.metallic = (float)pbr.metallicFactor;
         if (pbr.metallicRoughnessTexture.index > -1)
-            material.metallicRoughnessTexID = (float)pbr.metallicRoughnessTexture.index + scene->textures.size();
+            material.metallicRoughnessTexID = (float)pbr.metallicRoughnessTexture.index + curTexSize;
 
-        material.normalmapTexID = (float)mat.normalTexture.index + scene->textures.size();
+        material.normalmapTexID = (float)mat.normalTexture.index + curTexSize;
 
         material.emission = vec3(mat.emissiveFactor[0], mat.emissiveFactor[1], mat.emissiveFactor[2]);
         if (mat.emissiveTexture.index > -1)
-            material.emissionmapTexID = (float)mat.emissiveTexture.index + scene->textures.size();
+            material.emissionmapTexID = (float)mat.emissiveTexture.index + curTexSize;
 
         if (mat.extensions.find("KHR_materials_transmission") != mat.extensions.end())
         {
@@ -160,6 +161,7 @@ void ModelLoader::loadMeshFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel
             }
 
             Mesh* mesh = new Mesh();
+            entt::entity entity = reg.create();
 
             std::vector<glm::vec3> vertices;
             std::vector<glm::vec3> normals;
@@ -250,8 +252,9 @@ void ModelLoader::loadMeshFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel
             // mesh->indices.insert(mesh->indices.end(), indices.begin(), indices.end());
 
             scene->meshes.push_back(mesh);
+            reg.emplace<Mesh*>(entity, mesh);
             meshMap[meshId].push_back(std::make_pair<int, int>(
-                scene->meshes.size() - 1, reg.view<Material>().size() + prim.material));
+                reg.view<Mesh*>().size() - 1, reg.view<Material>().size() + prim.material));
         }
     }
 }
@@ -262,7 +265,8 @@ void ModelLoader::loadTexturesFromGLTFModel(Scene *scene, tinygltf::Model& gltfM
     {
         auto& img = gltfModel.images[tex.source];
         Texture* texture = new Texture(img.width, img.height, img.component, tex.name, img.image.data());
-        scene->textures.push_back(texture);
+        entt::entity entity = reg.create();
+        reg.emplace<Texture*>(entity, texture);
     }
 }
 
@@ -407,8 +411,9 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
             if(img.isInit())
             {
                 Texture* texture = new Texture(img.Width(), img.Height(), 4, texName, img.Data());
-                scene->textures.push_back(texture);
-                return scene->textures.size() - 1;
+                entt::entity entity = reg.create();
+                reg.emplace<Texture*>(entity, texture);
+                return reg.view<Texture*>().size() - 1;
             }
         }
         return -1;

@@ -1,12 +1,17 @@
 #include "Renderer.h"
-#include "Core/Scene.h"
+#include "RenderResource.h"
 #include "ShaderManager.h"
-#include "core/Camera.h"
 #include "RenderDebug.h"
+
+#include "Core/Scene.h"
+#include "Core/Camera.h"
 #include "Core/Config.h"
+
 #include <fg/FrameGraph.hpp>
 #include <fg/Blackboard.hpp>
-#include "RenderResource.h"
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
+#include "stb_image.h"
 #include <random>
 
 Renderer::Renderer(entt::registry& _reg) : reg(_reg)
@@ -436,6 +441,125 @@ void Renderer::UpdateSceneBuffers()
         renderResource.add<GPULightData>(lightTex.texId);
     }
 
+    if(g_Config->bTexCombine || g_Config->lightMode == LightMode::PathTracing)
+    {
+        const auto texturesView = reg.view<Texture*>();
+        std::vector<Uchar> textureMapsArray;
+        Int reqWidth = g_Config->texWidth, reqHeight = g_Config->texHeight;
+        Int texBytes = reqWidth * reqHeight * 4;
+        textureMapsArray.resize(texBytes * texturesView.size());
+
+        Int count = 1, numTextures = texturesView.size();
+        for(auto textureView : texturesView)
+        {
+            Texture* texture = reg.get<Texture*>(textureView);
+            
+            if(texture->width != reqWidth || texture->height != reqHeight)
+            {
+                Uchar* resizedTex = new Uchar[texBytes];
+                stbir_resize_uint8(&texture->data[0], texture->width, texture->height, 0, resizedTex, reqWidth, reqHeight, 0, 4);
+                std::copy(resizedTex, resizedTex + texBytes, &textureMapsArray[(numTextures - count) * texBytes]);
+                delete[] resizedTex;
+            }
+            else
+            {
+                std::copy(texture->data.begin(), texture->data.end(), &textureMapsArray[(numTextures - count) * texBytes]);
+            }
+
+            count++;
+        }
     
+        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, texturesView.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
+            LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
+        GPUTexture textureArrayTex = generateTexture(textureArrayDesc);
+        renderResource.add<GPUCombinedTextureData>(textureArrayTex.texId);
+    }
+
+    InitMeshBuffer();
+}
+
+void Renderer::InitMeshBuffer()
+{
+
+    if(g_Config->lightMode != LightMode::PathTracing)
+    {
+        // std::sort(meshInstances.begin(), meshInstances.end(), [&](MeshInstance& instance1, MeshInstance& instance2)
+        // {
+        //     return instance1.meshID != instance2.meshID ? instance1.meshID < instance2.meshID : instance1.materialID < instance2.materialID;
+        // });
+    
+        // auto CopyData = [&](MeshBatch* meshBatch, auto& meshes, auto& meshInstances, int index)
+        // {
+        //     meshBatch->instanceCount++;
+        //     meshBatch->vertices.insert(meshBatch->vertices.end(), 
+        //         meshes[meshInstances[index].meshID]->vertices.begin(), 
+        //         meshes[meshInstances[index].meshID]->vertices.end());
+        //     meshBatch->indices.insert(meshBatch->indices.end(), 
+        //         meshes[meshInstances[index].meshID]->indices.begin(), 
+        //         meshes[meshInstances[index].meshID]->indices.end());
+        //     meshBatch->normals.insert(meshBatch->normals.end(), 
+        //         meshes[meshInstances[index].meshID]->normals.begin(), 
+        //         meshes[meshInstances[index].meshID]->normals.end());
+        //     meshBatch->uvs.insert(meshBatch->uvs.end(), 
+        //         meshes[meshInstances[index].meshID]->uvs.begin(), 
+        //         meshes[meshInstances[index].meshID]->uvs.end());
+        //     for(int i = 0; i < meshes[meshInstances[index].meshID]->vertices.size(); i++)
+        //     {
+        //         meshBatch->materialIDs.push_back(meshInstances[index].materialID);
+        //     }
+        // };
+    
+        // std::vector<MeshBatch*> meshBatches;
+        // MeshBatch* meshBatch = new MeshBatch;
+        // Int pre = 0;
+        // CopyData(meshBatch, meshes, meshInstances, pre);
+        // for(Int i = 1; i < meshInstances.size(); i++)
+        // {
+        //     if(meshInstances[i].meshID != meshInstances[pre].meshID)
+        //     {
+        //         meshBatches.push_back(meshBatch);
+        //         meshBatch = new MeshBatch;
+        //     }
+        //    CopyData(meshBatch, meshes, meshInstances, i);
+        // }
+        // meshBatches.push_back(meshBatch);
+    }
+    else
+    {
+        InitPathTracingMeshBuffer();
+    }
+}
+
+void Renderer::InitPathTracingMeshBuffer()
+{
+    // TextureDesc verticeTexDesc{vertices.size() * sizeof(vec3), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+    //             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, vertices.data()};
+    // GPUTexture verticeTex = generateTexture(verticeTexDesc);
+
+    // TextureDesc indiceTexDesc{indices.size() * sizeof(Indice), 0, 0, TextureType::Buffer, TextureFormat::RGB32I,
+    //             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, indices.data()};
+    // GPUTexture indicesTex = generateTexture(indiceTexDesc);
+
+    // TextureDesc normalTexDesc{normals.size() * sizeof(vec3), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+    //             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, normals.data()};
+    // GPUTexture normalTex = generateTexture(normalTexDesc);
+
+    // TextureDesc uvTexDesc{uvs.size() * sizeof(vec2), 0, 0, TextureType::Buffer, TextureFormat::RG32F,
+    //             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, uvs.data()};
+    // GPUTexture uvsTex = generateTexture(uvTexDesc);
+
+    // TextureDesc bvhTexDesc{bvhTranslator.nodes.size() * sizeof(BvhTranslator::Node), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
+    //             NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, bvhTranslator.nodes.data()};
+    // GPUTexture bvhTex = generateTexture(bvhTexDesc);
+
+    // PathTracingData& pathTracingData = renderResource.get<PathTracingData>();
+    // pathTracingData.vertexData = verticeTex.texId;
+    // pathTracingData.indiceData = indicesTex.texId;
+    // pathTracingData.normalData = normalTex.texId;
+    // pathTracingData.bvhData = bvhTex.texId;
+}
+
+void Renderer::InitGPUBuffer()
+{
 
 }

@@ -13,6 +13,7 @@ void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scen
     const auto gBufferData = renderResource.get<GBufferData>();
     const auto gpuMatData = renderResource.get<GPUMaterialData>();
     const auto gpuTransformData = renderResource.get<GPUTransformData>();
+    const auto gpuCombinedTexData = renderResource.get<GPUCombinedTextureData>();
 
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferData.gBufferFBO);
 
@@ -41,7 +42,7 @@ void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scen
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gpuMatData.matTexData);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
+    glBindTexture(GL_TEXTURE_2D_ARRAY, gpuCombinedTexData.combinedTexData);
 
     auto meshBatches = scene->GetMeshBatches();
     Int instanceBase = 0, curInstanceCount = 0;

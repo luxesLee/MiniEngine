@@ -35,6 +35,11 @@ struct GPULightData
     RenderResourceHandle lightData;
 };
 
+struct GPUCombinedTextureData
+{
+    RenderResourceHandle combinedTexData;
+};
+
 struct ShadowMapData
 {
     RenderResourceHandle shadowPassFBO;
@@ -72,9 +77,6 @@ struct PathTracingData
     RenderResourceHandle indiceData;
     RenderResourceHandle normalData;
     RenderResourceHandle uvData;
-    RenderResourceHandle lightData;
-
     RenderResourceHandle bvhData;
-    RenderResourceHandle texArrayData;
 };
 

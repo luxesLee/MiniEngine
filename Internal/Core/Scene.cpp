@@ -3,9 +3,6 @@
 #include "Camera.h"
 #include "Config.h"
 #include "Util/LTCMatrix.h"
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize.h"
-#include "stb_image.h"
 
 void Scene::BuildScene()
 {
@@ -15,12 +12,10 @@ void Scene::BuildScene()
         createTLAS();   // Top Level Acceleration Structure -- for meshInstance
         bvhTranslator.Process(sceneBvh.get(), meshes, meshInstances);
         prepareMeshData();
-        prepareTexture();
     }
     else
     {
         CombineMesh();
-        prepareTexture();
         // 目的是拿包围盒
         createBLAS();
         createTLAS();
@@ -46,15 +41,7 @@ void Scene::CleanScene()
     }
     meshes.resize(0);
     meshInstances.resize(0);
-    for(int i = 0; i < textures.size(); i++)
-    {
-        if(textures[i])
-        {
-            delete textures[i];
-            textures[i] = nullptr;
-        }
-    }
-    textureMapsArray.resize(0);
+
     envMap = std::make_shared<EnvMap>();
     sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
 
@@ -206,31 +193,6 @@ void Scene::prepareMeshData()
     }
 }
 
-void Scene::prepareTexture()
-{
-    int reqWidth = g_Config->texWidth, reqHeight = g_Config->texHeight;
-    int texBytes = reqWidth * reqHeight * 4;
-    textureMapsArray.resize(texBytes * textures.size());
-
-#pragma omp parallel for
-    for(int i = 0; i < textures.size(); i++)
-    {
-        int texWidth = textures[i]->width;
-        int texHeight = textures[i]->height;
-
-        // Resize textures to fit 2D texture array
-        if (texWidth != reqWidth || texHeight != reqHeight)
-        {
-            unsigned char* resizedTex = new unsigned char[texBytes];
-            stbir_resize_uint8(&textures[i]->data[0], texWidth, texHeight, 0, resizedTex, reqWidth, reqHeight, 0, 4);
-            std::copy(resizedTex, resizedTex + texBytes, &textureMapsArray[i * texBytes]);
-            delete[] resizedTex;
-        }
-        else
-            std::copy(textures[i]->data.begin(), textures[i]->data.end(), &textureMapsArray[i * texBytes]);
-    }
-}
-
 void Scene::BuildEnvMap()
 {
     if(envMap->envTextures.size() == 0)
@@ -316,17 +278,9 @@ void Scene::UploadDataToGpu()
         TextureDesc bvhTexDesc{bvhTranslator.nodes.size() * sizeof(BvhTranslator::Node), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
                                 NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, bvhTranslator.nodes.data()};
         bvhTex = generateTexture(bvhTexDesc);
-
-        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
-                            LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
-        textureArrayTex = generateTexture(textureArrayDesc);
     }
     else
     {
-        TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
-                            LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
-        textureArrayTex = generateTexture(textureArrayDesc);
-
         for(auto& meshBatch : meshBatches)
         {
             meshBatch->Build();

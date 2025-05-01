@@ -45,6 +45,11 @@ private:
 public:
     void UpdateSceneBuffers();
 
+private:
+    void InitMeshBuffer();
+    void InitPathTracingMeshBuffer();
+    void InitGPUBuffer();
+
 public:
     void Update(Scene* scene);
     void Render(Scene* scene);

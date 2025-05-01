@@ -45,6 +45,7 @@ private:
     GLuint gBufferTexId[4];
     GLuint gpuMatTex;
     GLuint gpuLightTex;
+    GLuint gpuCombinedTex;
 
     glm::mat4 projMat;
 };

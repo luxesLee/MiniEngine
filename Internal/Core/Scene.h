@@ -16,6 +16,7 @@
 #include "Render/Texture.h"
 #include <bvh.h>
 #include <bvh_translator.h>
+#include "entt.hpp"
 
 using namespace RadeonRays;
 class Renderer;
@@ -87,9 +88,9 @@ public:
     }
 
     template <typename T> 
-    T& getResource()
+    T& get()
     {
-        return const_cast<T&>(const_cast<const FrameGraphBlackboard *>(this)->get<T>());
+        return const_cast<T&>(const_cast<const RenderResource *>(this)->get<T>());
     }
 
     template <typename T> 
@@ -101,6 +102,28 @@ public:
 private:
     std::unordered_map<std::type_index, std::any> storages;
 };
+
+// class MeshInitializer
+// {
+// public:
+//     MeshInitializer(entt::registry& _reg) : reg(_reg)
+//     {
+//         sceneBvh = std::make_shared<Bvh>(10.0f, 64, true);
+//     }
+
+//     ~MeshInitializer()
+//     {
+
+//     }
+
+// private:
+
+
+// private:
+//     entt::registry& reg;
+//     std::shared_ptr<Bvh> sceneBvh;
+//     BvhTranslator bvhTranslator;
+// };
 
 class Scene
 {
@@ -170,7 +193,6 @@ private:
     void createTLAS();
     void createBLAS();
     void prepareMeshData();
-    void prepareTexture();
 
     std::shared_ptr<Bvh> sceneBvh;
     BvhTranslator bvhTranslator;
@@ -179,9 +201,6 @@ private:
     std::vector<Indice> indices;
     std::vector<vec3> normals;
     std::vector<vec2> uvs;
-
-    std::vector<Texture*> textures;
-    std::vector<Uchar> textureMapsArray;
 
     void BuildEnvMap();
     std::shared_ptr<EnvMap> envMap;
@@ -193,7 +212,6 @@ public:
     GLuint getUVTexId() const {return uvsTex.texId;}
     GLuint getBVHTexId() const {return bvhTex.texId;}
     GLuint getEnvTexId() const {return envTex.texId;}
-    GLuint getTextureArrayId() const {return textureArrayTex.texId;}
     GLuint getIrradianceEnvTexId() const {return irradianceEnvTex.texId;}
 
 private:
@@ -203,6 +221,5 @@ private:
     GPUTexture uvsTex;
     GPUTexture bvhTex;
     GPUTexture envTex;
-    GPUTexture textureArrayTex;
     GPUTexture irradianceEnvTex;
 };

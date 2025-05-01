@@ -39,6 +39,8 @@ void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sc
     gpuMatTex = gpuMatData.matTexData;
     const auto gpuLightData = renderResource.get<GPULightData>();
     gpuLightTex = gpuLightData.lightData;
+    const auto gpuCombinedTexData = renderResource.get<GPUCombinedTextureData>();
+    gpuCombinedTex = gpuCombinedTexData.combinedTexData;
 
     AddVoxelSceneBuildPass(fg, blackboard, scene);
     AddLightInjectPass(fg, blackboard, scene);
@@ -167,7 +169,7 @@ void VXGIPass::AddVoxelSceneBuildPass(FrameGraph &fg, FrameGraphBlackboard &blac
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gpuMatTex);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
+    glBindTexture(GL_TEXTURE_2D_ARRAY, gpuCombinedTex);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);

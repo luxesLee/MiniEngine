@@ -70,6 +70,8 @@ public:
     ToneMappingType curToneMapping = ToneMappingType::Linear;
     Uint32 texWidth = 512, texHeight = 512;
 
+    Bool bTexCombine = true;
+
     Bool bPreDepthPass = false;
 
     // shadow
