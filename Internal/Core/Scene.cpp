@@ -15,7 +15,6 @@ void Scene::BuildScene()
         createTLAS();   // Top Level Acceleration Structure -- for meshInstance
         bvhTranslator.Process(sceneBvh.get(), meshes, meshInstances);
         prepareMeshData();
-        prepareTransform();
         prepareTexture();
     }
     else
@@ -36,7 +35,6 @@ void Scene::CleanScene()
     indices.resize(0);
     normals.resize(0);
     uvs.resize(0);
-    materials.resize(0);
     lights.resize(0);
     for(int i = 0; i < meshes.size(); i++)
     {
@@ -48,7 +46,6 @@ void Scene::CleanScene()
     }
     meshes.resize(0);
     meshInstances.resize(0);
-    transforms.resize(0);
     for(int i = 0; i < textures.size(); i++)
     {
         if(textures[i])
@@ -81,7 +78,7 @@ void Scene::AppendLightMesh(const Light &light)
 
     Material material;
     material.emission = light.color;
-    materials.push_back(material);
+    // materials.push_back(material);
 
     auto AppendMesh = [&](Mesh* meshes, std::vector<glm::vec3>& vertArray, std::vector<glm::vec3>& normalArray)
     {
@@ -118,10 +115,10 @@ void Scene::AppendLightMesh(const Light &light)
     }
     meshes.push_back(mesh);
 
-    MeshInstance meshInstance(meshes.size() - 1, 
-                                materials.size() - 1, 
-                                glm::mat4(1.0f));
-    meshInstances.push_back(meshInstance);
+    // MeshInstance meshInstance(meshes.size() - 1, 
+    //                             materials.size() - 1, 
+    //                             glm::mat4(1.0f));
+    // meshInstances.push_back(meshInstance);
 }
 
 void Scene::CombineMesh()
@@ -131,7 +128,7 @@ void Scene::CombineMesh()
         return instance1.meshID != instance2.meshID ? instance1.meshID < instance2.meshID : instance1.materialID < instance2.materialID;
     });
 
-    auto CopyData = [&](MeshBatch* meshBatch, auto& meshes, auto& meshInstances, auto& transforms, int index)
+    auto CopyData = [&](MeshBatch* meshBatch, auto& meshes, auto& meshInstances, int index)
     {
         meshBatch->instanceCount++;
         meshBatch->vertices.insert(meshBatch->vertices.end(), 
@@ -150,13 +147,11 @@ void Scene::CombineMesh()
         {
             meshBatch->materialIDs.push_back(meshInstances[index].materialID);
         }
-        
-        transforms.push_back(meshInstances[index].transform);
     };
 
     MeshBatch* meshBatch = new MeshBatch;
     Int pre = 0;
-    CopyData(meshBatch, meshes, meshInstances, transforms, pre);
+    CopyData(meshBatch, meshes, meshInstances, pre);
     for(Int i = 1; i < meshInstances.size(); i++)
     {
         if(meshInstances[i].meshID != meshInstances[pre].meshID)
@@ -164,7 +159,7 @@ void Scene::CombineMesh()
             meshBatches.push_back(meshBatch);
             meshBatch = new MeshBatch;
         }
-       CopyData(meshBatch, meshes, meshInstances, transforms, i);
+       CopyData(meshBatch, meshes, meshInstances, i);
     }
     meshBatches.push_back(meshBatch);
 }
@@ -208,16 +203,6 @@ void Scene::prepareMeshData()
         normals.insert(normals.end(), meshes[i]->normals.begin(), meshes[i]->normals.end());
         uvs.insert(uvs.end(), meshes[i]->uvs.begin(), meshes[i]->uvs.end());
         curVerticeNum += meshes[i]->vertices.size();
-    }
-}
-
-void Scene::prepareTransform()
-{
-    transforms.resize(meshInstances.size());
-#pragma omp parallel for
-    for(int i = 0; i < meshInstances.size(); ++i)
-    {
-        transforms[i] = meshInstances[i].transform;
     }
 }
 
@@ -328,18 +313,6 @@ void Scene::UploadDataToGpu()
                                 NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, uvs.data()};
         uvsTex = generateTexture(uvTexDesc);
 
-        TextureDesc matDesc{materials.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, materials.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
-        matTex = generateTexture(matDesc);
-
-        TextureDesc lightDesc{lights.size() * sizeof(Light), 0, 0, TextureType::Buffer, TextureFormat::RGBA32F,
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, lights.data()};
-        lightTex = generateTexture(lightDesc);
-
-        TextureDesc instanceTransformDesc{transforms.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
-        instanceTransformTex = generateTexture(instanceTransformDesc);
-
         TextureDesc bvhTexDesc{bvhTranslator.nodes.size() * sizeof(BvhTranslator::Node), 0, 0, TextureType::Buffer, TextureFormat::RGB32F,
                                 NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, bvhTranslator.nodes.data()};
         bvhTex = generateTexture(bvhTexDesc);
@@ -350,18 +323,6 @@ void Scene::UploadDataToGpu()
     }
     else
     {
-        TextureDesc matDesc{materials.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, materials.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
-        matTex = generateTexture(matDesc);
-
-        TextureDesc instanceTransformDesc{transforms.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
-        instanceTransformTex = generateTexture(instanceTransformDesc);
-
-        TextureDesc lightDesc{lights.size() * sizeof(Light), 0, 0, TextureType::Buffer, TextureFormat::RGBA32F,
-                            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, lights.data()};
-        lightTex = generateTexture(lightDesc);
-
         TextureDesc textureArrayDesc{g_Config->texWidth, g_Config->texHeight, textures.size(), TextureType::TEXTURE_2D_ARRAY, TextureFormat::RGBA8,
                             LINEAR_REPEAT_SAMPLER, 0, textureMapsArray.data(), DataFormat::DataFormat_RGBA, DataType::UNSIGNED_BYTE};
         textureArrayTex = generateTexture(textureArrayDesc);

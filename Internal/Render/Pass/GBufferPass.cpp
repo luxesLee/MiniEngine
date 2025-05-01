@@ -11,6 +11,9 @@
 void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
     const auto gBufferData = renderResource.get<GBufferData>();
+    const auto gpuMatData = renderResource.get<GPUMaterialData>();
+    const auto gpuTransformData = renderResource.get<GPUTransformData>();
+
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferData.gBufferFBO);
 
     Shader* shaderBasePass = g_ShaderManager.GetShader("BasePass");
@@ -34,9 +37,9 @@ void GBufferPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scen
     glDepthFunc(g_Config->bPreDepthPass ? GL_EQUAL : GL_GREATER);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, scene->getTransformTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuTransformData.transformData);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, scene->getMatTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuMatData.matTexData);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
 

@@ -6,7 +6,7 @@
 Engine::Engine()
 {
     modelLoader = std::make_unique<ModelLoader>(reg);
-    renderer = std::make_unique<Renderer>();
+    renderer = std::make_unique<Renderer>(reg);
     scene = std::make_unique<Scene>();
 }
 
@@ -49,6 +49,8 @@ void Engine::UpdateScene(const SceneConfig& config)
     {
         scene->AppendLightMesh(light);
         scene->AppendLight(Light(light));
+        entt::entity entity = reg.create();
+        reg.emplace<Light>(entity, light);
     }
 
     if(config.envMapConfig.bCubeMap)
@@ -59,6 +61,7 @@ void Engine::UpdateScene(const SceneConfig& config)
     scene->BuildScene();
     scene->InitShadowMapFBO();
     renderer->InitRenderResource();
+    renderer->UpdateSceneBuffers();
 }
 
 void Engine::ReLoad()

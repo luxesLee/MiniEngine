@@ -22,6 +22,9 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
 {
     const auto pathTracingData = renderResource.get<PathTracingData>();
     const auto defaultData = renderResource.get<DefaultData>();
+    const auto gpuMatData = renderResource.get<GPUMaterialData>();
+    const auto gpuLightData = renderResource.get<GPULightData>();
+    const auto gpuTransformData = renderResource.get<GPUTransformData>();
 
     Shader* shaderPathTracing = g_ShaderManager.GetShader("PathTracing");
     if(!shaderPathTracing)
@@ -51,14 +54,14 @@ void PathTracingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard& blackboard, 
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_BUFFER, scene->getBVHTexId());
     glActiveTexture(GL_TEXTURE6);
-    glBindTexture(GL_TEXTURE_2D, scene->getMatTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuMatData.matTexData);
     glActiveTexture(GL_TEXTURE7);
-    glBindTexture(GL_TEXTURE_BUFFER, scene->getLightTexId());
+    glBindTexture(GL_TEXTURE_BUFFER, gpuLightData.lightData);
     // glActiveTexture(GL_TEXTURE8);
     // glBindTexture(GL_TEXTURE_BUFFER, scene->getEnvTexId());
     // checkGLError();
     glActiveTexture(GL_TEXTURE9);
-    glBindTexture(GL_TEXTURE_2D, scene->getTransformTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuTransformData.transformData);
     glActiveTexture(GL_TEXTURE10);
     glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
 

@@ -9,13 +9,16 @@
 
 void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
+    const auto defaultData = renderResource.get<DefaultData>();
+    GLuint curOutputTexId = defaultData.defaultColorData[scene->curOutputTex];
+    const auto gBufferData = renderResource.get<GBufferData>();
+    const auto gpuLightData = renderResource.get<GPULightData>();
+
     Shader* shaderDeferredLighting = g_ShaderManager.GetShader("DeferredLighting");
     if(!shaderDeferredLighting)
     {
         return;
     }
-
-    const auto gBufferData = renderResource.get<GBufferData>();
 
     // 输入
     glActiveTexture(GL_TEXTURE0);
@@ -29,14 +32,12 @@ void DeferredLightingPass::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackbo
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, gBufferData.gBufferDepthStencil);
     glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_BUFFER, scene->getLightTexId());
+    glBindTexture(GL_TEXTURE_BUFFER, gpuLightData.lightData);
 
     glActiveTexture(GL_TEXTURE8);
     glBindTexture(GL_TEXTURE_CUBE_MAP, scene->getIrradianceEnvTexId());
 
     // 输出
-    const auto defaultData = renderResource.get<DefaultData>();
-    GLuint curOutputTexId = defaultData.defaultColorData[scene->curOutputTex];
     glBindImageTexture(0, curOutputTexId, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
     // Uniform

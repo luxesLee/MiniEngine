@@ -20,7 +20,17 @@ struct GBufferData{
     RenderResourceHandle gBufferDepthStencil;
 };
 
-struct LightData
+struct GPUTransformData
+{
+    RenderResourceHandle transformData;
+};
+
+struct GPUMaterialData
+{
+    RenderResourceHandle matTexData;
+};
+
+struct GPULightData
 {
     RenderResourceHandle lightData;
 };
@@ -63,7 +73,6 @@ struct PathTracingData
     RenderResourceHandle normalData;
     RenderResourceHandle uvData;
     RenderResourceHandle lightData;
-    RenderResourceHandle matTexData;
 
     RenderResourceHandle bvhData;
     RenderResourceHandle texArrayData;

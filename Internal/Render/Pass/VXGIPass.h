@@ -43,6 +43,8 @@ private:
     GLuint screenVAO;
 
     GLuint gBufferTexId[4];
+    GLuint gpuMatTex;
+    GLuint gpuLightTex;
 
     glm::mat4 projMat;
 };

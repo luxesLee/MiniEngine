@@ -9,6 +9,8 @@
 #include "Pass/ToneMappingPass.h"
 #include "Pass/IDenoisePass.h"
 
+#include "entt.hpp"
+
 class FrameGraph;
 class FrameGraphBlackboard;
 class Scene;
@@ -16,7 +18,8 @@ class Scene;
 class Renderer
 {
 public:
-    Renderer();
+    Renderer() = delete;
+    Renderer(entt::registry& _reg);
     ~Renderer() 
     {
         if(denoisePass)
@@ -27,6 +30,7 @@ public:
 
     void Resize();
 
+public:
     void InitRenderResource();
     void DeleteRenderResource();
 
@@ -37,6 +41,9 @@ private:
     void InitShadowMapRenderingResourceData();
     void InitSSAORenderingResourceData();
     void InitVXGIRenderingResourceData();
+
+public:
+    void UpdateSceneBuffers();
 
 public:
     void Update(Scene* scene);
@@ -53,6 +60,7 @@ private:
 // -------------------------------------------------------------------------------------------
 private:
     RenderResource              renderResource;
+    entt::registry&             reg;
 
     GBufferPass                 basePass;
     AmbientOcclusionRenderer    aoRenderer;

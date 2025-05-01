@@ -35,6 +35,11 @@ void VXGIPass::AddBuildPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Sc
     gBufferTexId[2] = gBufferData.gBuffer2;
     gBufferTexId[3] = gBufferData.gBuffer3;
 
+    const auto gpuMatData = renderResource.get<GPUMaterialData>();
+    gpuMatTex = gpuMatData.matTexData;
+    const auto gpuLightData = renderResource.get<GPULightData>();
+    gpuLightTex = gpuLightData.lightData;
+
     AddVoxelSceneBuildPass(fg, blackboard, scene);
     AddLightInjectPass(fg, blackboard, scene);
     AddGenerateMipmapPass(fg, blackboard, scene);
@@ -160,7 +165,7 @@ void VXGIPass::AddVoxelSceneBuildPass(FrameGraph &fg, FrameGraphBlackboard &blac
     glBindImageTexture(1, normal3DTexId, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, scene->getMatTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuMatTex);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, scene->getTextureArrayId());
 
@@ -198,7 +203,7 @@ void VXGIPass::AddLightInjectPass(FrameGraph &fg, FrameGraphBlackboard &blackboa
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, normal3DTexId);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_BUFFER, scene->getLightTexId());
+    glBindTexture(GL_TEXTURE_BUFFER, gpuLightTex);
 
     shaderLightInject->use();
     shaderLightInject->setInt("VoxelSize", g_Config->VoxelSize);

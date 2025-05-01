@@ -161,7 +161,6 @@ public:
 private:
     std::vector<Mesh*> meshes;
     std::vector<MeshInstance> meshInstances;
-    std::vector<Material> materials;
     std::vector<Light> lights;
 
     void CombineMesh();
@@ -171,7 +170,6 @@ private:
     void createTLAS();
     void createBLAS();
     void prepareMeshData();
-    void prepareTransform();
     void prepareTexture();
 
     std::shared_ptr<Bvh> sceneBvh;
@@ -182,7 +180,6 @@ private:
     std::vector<vec3> normals;
     std::vector<vec2> uvs;
 
-    std::vector<mat4> transforms;
     std::vector<Texture*> textures;
     std::vector<Uchar> textureMapsArray;
 
@@ -195,10 +192,7 @@ public:
     GLuint getNormalTexId() const {return normalTex.texId;}
     GLuint getUVTexId() const {return uvsTex.texId;}
     GLuint getBVHTexId() const {return bvhTex.texId;}
-    GLuint getMatTexId() const {return matTex.texId;}
-    GLuint getLightTexId() const {return lightTex.texId;}
     GLuint getEnvTexId() const {return envTex.texId;}
-    GLuint getTransformTexId() const {return instanceTransformTex.texId;}
     GLuint getTextureArrayId() const {return textureArrayTex.texId;}
     GLuint getIrradianceEnvTexId() const {return irradianceEnvTex.texId;}
 
@@ -207,9 +201,6 @@ private:
     GPUTexture indicesTex;
     GPUTexture normalTex;
     GPUTexture uvsTex;
-    GPUTexture lightTex;
-    GPUTexture matTex;
-    GPUTexture instanceTransformTex;
     GPUTexture bvhTex;
     GPUTexture envTex;
     GPUTexture textureArrayTex;

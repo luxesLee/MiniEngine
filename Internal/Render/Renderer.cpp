@@ -9,7 +9,7 @@
 #include "RenderResource.h"
 #include <random>
 
-Renderer::Renderer()
+Renderer::Renderer(entt::registry& _reg) : reg(_reg)
 {
     g_ShaderManager.InitShader();
 
@@ -44,7 +44,6 @@ void Renderer::Update(Scene* scene)
     {
         denoisePass = CreateDenoisePass();
     }
-
 }
 
 void Renderer::Render(Scene *scene)
@@ -387,4 +386,56 @@ void Renderer::InitVXGIRenderingResourceData()
     GPUTexture radiance3DTex = generateTexture(desc2);
 
     renderResource.add<VXGIData>(vxgiFBO, albedo3DTex.texId, normal3DTex.texId, radiance3DTex.texId);
+}
+
+void Renderer::UpdateSceneBuffers()
+{
+    if(true)
+    {
+        std::vector<Material> materials_GPU;
+        const auto materialsView = reg.view<Material>();
+        for(auto matView : materialsView)
+        {
+            Material& mat = reg.get<Material>(matView);
+            materials_GPU.emplace_back(mat);
+        }
+        std::reverse(materials_GPU.begin(), materials_GPU.end());
+        TextureDesc matDesc{materials_GPU.size() * sizeof(Material) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
+            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, materials_GPU.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        GPUTexture matTex = generateTexture(matDesc);
+        renderResource.add<GPUMaterialData>(matTex.texId);
+    }
+
+    {
+        std::vector<glm::mat4> transforms_GPU;
+        const auto instancesView = reg.view<MeshInstance>();
+        for(auto instanceView : instancesView)
+        {
+            MeshInstance& meshInstance = reg.get<MeshInstance>(instanceView);
+            transforms_GPU.emplace_back(meshInstance.transform);
+        }
+        std::reverse(transforms_GPU.begin(), transforms_GPU.end());
+        TextureDesc transformDesc{transforms_GPU.size() * sizeof(mat4) / sizeof(vec4), 1, 0, TextureType::TEXTURE_2D, TextureFormat::RGBA32F, 
+            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, transforms_GPU.data(), DataFormat::DataFormat_RGBA, DataType::FLOAT};
+        GPUTexture transformTex = generateTexture(transformDesc);
+        renderResource.add<GPUTransformData>(transformTex.texId);
+    }
+
+    {
+        std::vector<Light> lights_GPU;
+        const auto lightsView = reg.view<Light>();
+        for(auto lightView : lightsView)
+        {
+            Light& light = reg.get<Light>(lightView);
+            lights_GPU.emplace_back(light);
+        }
+        std::reverse(lights_GPU.begin(), lights_GPU.end());
+        TextureDesc lightDesc{lights_GPU.size() * sizeof(Light), 0, 0, TextureType::Buffer, TextureFormat::RGBA32F,
+            NEAREST_CLAMP_TO_EDGE_BLACK_BORDER_SAMPLER, 0, lights_GPU.data()};
+        GPUTexture lightTex = generateTexture(lightDesc);
+        renderResource.add<GPULightData>(lightTex.texId);
+    }
+
+    
+
 }

@@ -13,6 +13,7 @@ void ShadowRenderer::InitLightMatrix(Scene *scene)
 void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, Scene *scene, RenderResource& renderResource)
 {
     const auto shadowPassData = renderResource.get<ShadowMapData>();
+    const auto gpuTransformData = renderResource.get<GPUTransformData>();
 
     Shader* shaderShadowDepth = nullptr;
     auto meshBatch = scene->GetMeshBatches();
@@ -23,7 +24,7 @@ void ShadowRenderer::AddPass(FrameGraph &fg, FrameGraphBlackboard &blackboard, S
     glCullFace(GL_FRONT);  // peter panning
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, scene->getTransformTexId());
+    glBindTexture(GL_TEXTURE_2D, gpuTransformData.transformData);
 
     auto DrawMesh = [&](Shader* shader, const std::vector<MeshBatch*>& meshBatches)
     {

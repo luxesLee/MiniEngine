@@ -16,12 +16,7 @@
 
 void ModelLoader::loadEnvMap(Scene *scene, const std::string &filePath)
 {
-    // Image image(filePath);
-    // if(image.isInit())
-    {
-        // Texture* envMapTex = new Texture(image.Width(), image.Height());
-        // scene->envMap = envMapTex;
-    }
+
 }
 
 void ModelLoader::loadEnvMap(Scene *scene, const std::vector<std::string> &filePaths)
@@ -113,6 +108,7 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
         const tinygltf::PbrMetallicRoughness pbr = mat.pbrMetallicRoughness;
 
         Material material;
+        entt::entity entity = reg.create();
 
         material.baseColor = Vec3((float)pbr.baseColorFactor[0], (float)pbr.baseColorFactor[1], (float)pbr.baseColorFactor[2]);
         if (pbr.baseColorTexture.index > -1)
@@ -140,13 +136,14 @@ void ModelLoader::loadMatFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel)
                 material.specTrans = (float)(ext.Get("transmissionFactor").Get<double>());
         }
         
-        scene->materials.push_back(material);
+        reg.emplace<Material>(entity, material);
     }
 
     if(gltfModel.materials.size() == 0)
     {
         static Material defaultMat;
-        scene->materials.push_back(defaultMat);
+        entt::entity entity = reg.create();
+        reg.emplace<Material>(entity, defaultMat);
     }
 }
 
@@ -253,7 +250,8 @@ void ModelLoader::loadMeshFromGLTFModel(Scene *scene, tinygltf::Model& gltfModel
             // mesh->indices.insert(mesh->indices.end(), indices.begin(), indices.end());
 
             scene->meshes.push_back(mesh);
-            meshMap[meshId].push_back(std::make_pair<int, int>(scene->meshes.size() - 1, scene->materials.size() + prim.material));
+            meshMap[meshId].push_back(std::make_pair<int, int>(
+                scene->meshes.size() - 1, reg.view<Material>().size() + prim.material));
         }
     }
 }
@@ -306,6 +304,8 @@ void ModelLoader::loadInstanceFromGLTFModel(Scene* scene, tinygltf::Model& gltfM
             {
                 MeshInstance meshInstance(prim.first, prim.second, matTmp);
                 scene->meshInstances.push_back(meshInstance);
+                entt::entity entity = reg.create();
+                reg.emplace<MeshInstance>(entity, meshInstance);
             }
         }
 
@@ -348,7 +348,8 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
     if(modelConfig.materialName != "" && matConfigMap.count(modelConfig.materialName))
     {
         bMatAlreadyLoad = true;
-        scene->materials.push_back((matConfigMap.find(modelConfig.materialName))->second.mat);
+        entt::entity entity = reg.create();
+        reg.emplace<Material>(entity, (matConfigMap.find(modelConfig.materialName))->second.mat);
     }
 
     // OBJ格式无实例概念
@@ -386,11 +387,16 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
             indexOffset += 3;
         }
         scene->meshes.push_back(mesh);
+        entt::entity entity = reg.create();
+        reg.emplace<Mesh*>(entity, mesh);
+
         MeshInstance meshInstance(scene->meshes.size() - 1, 
-                                scene->materials.size() - 1 + (bMatAlreadyLoad ? 0 : objMesh.material_ids[0]), 
-                                modelConfig.transform);
+            reg.view<Material>().size() - 1 + (bMatAlreadyLoad ? 0 : objMesh.material_ids[0]), 
+            modelConfig.transform);
 
         scene->meshInstances.push_back(meshInstance);
+        entity = reg.create();
+        reg.emplace<MeshInstance>(entity, meshInstance);
     }
 
     auto InsertTex2Scene = [&](const std::string& texName) -> Int
@@ -423,7 +429,8 @@ entt::entity ModelLoader::loadOBJModel(Scene *scene, const ModelConfig& modelCon
         material.normalmapTexID = InsertTex2Scene(objMat.normal_texname);
         material.emissionmapTexID = InsertTex2Scene(objMat.emissive_texname);
 
-        scene->materials.push_back(material);
+        entt::entity entity = reg.create();
+        reg.emplace<Material>(entity, material);
     }
 
     return entt::null;
